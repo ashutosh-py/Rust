@@ -1,6 +1,8 @@
 use crate::cell::UnsafeCell;
 use crate::fmt;
 use crate::mem;
+use crate::ops::Residual;
+use crate::ops::Try;
 
 /// A cell which can be written to only once.
 ///
@@ -136,8 +138,12 @@ impl<T> OnceCell<T> {
     }
 
     /// Gets the contents of the cell, initializing it with `f` if
-    /// the cell was empty. If the cell was empty and `f` failed, an
-    /// error is returned.
+    /// the cell was empty. If the cell was empty and `f` short-circuits,
+    /// the residual is returned.
+    ///
+    /// The return type of this method depends on the return type of the
+    /// closure. If it returns `Result<T, E>`, the output is `Result<&T, E>`.
+    /// If it returns `Option<T>`, the output is `Option<&T>`.
     ///
     /// # Panics
     ///
@@ -156,6 +162,7 @@ impl<T> OnceCell<T> {
     ///
     /// let cell = OnceCell::new();
     /// assert_eq!(cell.get_or_try_init(|| Err(())), Err(()));
+    /// assert_eq!(cell.get_or_try_init(|| None), None);
     /// assert!(cell.get().is_none());
     /// let value = cell.get_or_try_init(|| -> Result<i32, ()> {
     ///     Ok(92)
@@ -164,19 +171,21 @@ impl<T> OnceCell<T> {
     /// assert_eq!(cell.get(), Some(&92))
     /// ```
     #[unstable(feature = "once_cell_try", issue = "109737")]
-    pub fn get_or_try_init<F, E>(&self, f: F) -> Result<&T, E>
+    pub fn get_or_try_init<'a, F, R>(&'a self, f: F) -> <R::Residual as Residual<&T>>::TryType
     where
-        F: FnOnce() -> Result<T, E>,
+        F: FnOnce() -> R,
+        R: Try<Output = T>,
+        R::Residual: Residual<&'a T>,
     {
         if let Some(val) = self.get() {
-            return Ok(val);
+            return Try::from_output(val);
         }
         /// Avoid inlining the initialization closure into the common path that fetches
         /// the already initialized value
         #[cold]
-        fn outlined_call<F, T, E>(f: F) -> Result<T, E>
+        fn outlined_call<F, R>(f: F) -> R
         where
-            F: FnOnce() -> Result<T, E>,
+            F: FnOnce() -> R,
         {
             f()
         }
@@ -186,7 +195,7 @@ impl<T> OnceCell<T> {
         // `assert`, while keeping `set/get` would be sound, but it seems
         // better to panic, rather than to silently use an old value.
         assert!(self.set(val).is_ok(), "reentrant init");
-        Ok(self.get().unwrap())
+        Try::from_output(self.get().unwrap())
     }
 
     /// Consumes the cell, returning the wrapped value.
