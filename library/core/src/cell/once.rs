@@ -171,7 +171,7 @@ impl<T> OnceCell<T> {
     /// assert_eq!(cell.get(), Some(&92))
     /// ```
     #[unstable(feature = "once_cell_try", issue = "109737")]
-    pub fn get_or_try_init<'a, F, R>(&'a self, f: F) -> <R::Residual as Residual<&T>>::TryType
+    pub fn get_or_try_init<'a, F, R>(&'a self, f: F) -> <R::Residual as Residual<&'a T>>::TryType
     where
         F: FnOnce() -> R,
         R: Try<Output = T>,
