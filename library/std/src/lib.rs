@@ -272,6 +272,8 @@
 #![feature(staged_api)]
 #![feature(thread_local)]
 #![feature(try_blocks)]
+#![feature(try_trait_v2)]
+#![feature(try_trait_v2_residual)]
 #![feature(utf8_chunks)]
 // tidy-alphabetical-end
 //
