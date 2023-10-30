@@ -1,4 +1,5 @@
 use crate::mir::interpret::{AllocRange, GlobalAlloc, Pointer, Provenance, Scalar};
+use crate::query::query_provider;
 use crate::query::IntoQueryParam;
 use crate::query::Providers;
 use crate::traits::util::supertraits_for_pretty_printing;
@@ -3095,7 +3096,7 @@ fn trimmed_def_paths(tcx: TyCtxt<'_>, (): ()) -> FxHashMap<DefId, Symbol> {
 }
 
 pub fn provide(providers: &mut Providers) {
-    *providers = Providers { trimmed_def_paths, ..*providers };
+    query_provider!(providers, provide(trimmed_def_paths) = trimmed_def_paths);
 }
 
 #[derive(Default)]

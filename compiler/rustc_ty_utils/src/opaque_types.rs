@@ -320,5 +320,5 @@ fn opaque_types_defined_by<'tcx>(
 }
 
 pub(super) fn provide(providers: &mut Providers) {
-    *providers = Providers { opaque_types_defined_by, ..*providers };
+    query_provider!(providers, provide(opaque_types_defined_by) = opaque_types_defined_by);
 }
