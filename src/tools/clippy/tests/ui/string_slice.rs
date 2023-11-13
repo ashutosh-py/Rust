@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-#[warn(clippy::string_slice)]
+#![warn(clippy::string_slice)]
 #[allow(clippy::no_effect)]
 
 fn main() {
