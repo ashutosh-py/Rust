@@ -1,0 +1,26 @@
+<pre class="rust item-decl"><code>
+    {{ self.render_attributes_in_code() | safe }}
+    {{ self.render_struct() | safe }}
+</code></pre>
+{{ self.document() | safe }}
+{% if self.should_render_fields %}
+    <h2 id="fields" class="fields small-section header">
+        {% if self.s.ctor_kind.is_none() %}
+            Fields
+        {% else %}
+            Tuple Fields
+        {% endif %}
+        {{ self::document_non_exhaustive_header(self.it) | safe }}
+        <a href="#fields" class="anchor">§</a>
+    </h2>
+    {{ self::document_non_exhaustive(self.it) | safe }}
+    {% for field in self.struct_field_items_iter() %}
+        <span id="{{ field.id }}" class="{{ ItemType::StructField ~}} small-section-header">
+            <a href="#{{ field.id }}" class="anchor field">§</a>
+            <code>{{ field.name|safe }}: {{~ field.ty|safe }}</code>
+        </span>
+        {{ self.document_field(field.item) | safe }}
+    {% endfor %}
+{% endif %}
+{{ self.render_assoc_items() | safe }}
+{{ self.document_type_layout() | safe }}

@@ -41,6 +41,10 @@ use crate::html::{highlight, static_files};
 use askama::Template;
 use itertools::Itertools;
 
+trait ItemTemplate<'a, 'cx: 'a>: askama::Template + fmt::Display {
+    fn item_and_mut_cx(&self) -> (&'a clean::Item, RefMut<'_, &'a mut Context<'cx>>);
+}
+
 /// Generates an Askama template struct for rendering items with common methods.
 ///
 /// Usage:
@@ -120,6 +124,16 @@ macro_rules! item_template_methods {
             display_fn(move |f| {
                 let (item, cx) = self.item_and_mut_cx();
                 let v = render_attributes_in_pre(item, "", &cx);
+                write!(f, "{v}")
+            })
+        }
+        item_template_methods!($($rest)*);
+    };
+    (render_attributes_in_code $($rest:tt)*) => {
+        fn render_attributes_in_code<'b>(&'b self) -> impl fmt::Display + Captures<'a> + 'b + Captures<'cx> {
+            display_fn(move |f| {
+                let (it, cx) = self.item_and_mut_cx();
+                let v = render_attributes_in_code(it, cx.tcx());
                 write!(f, "{v}")
             })
         }
@@ -319,10 +333,6 @@ fn toggle_open(mut w: impl fmt::Write, text: impl fmt::Display) {
 
 fn toggle_close(mut w: impl fmt::Write) {
     w.write_str("</details>").unwrap();
-}
-
-trait ItemTemplate<'a, 'cx: 'a>: askama::Template + fmt::Display {
-    fn item_and_mut_cx(&self) -> (&'a clean::Item, RefMut<'_, &'a mut Context<'cx>>);
 }
 
 fn item_module(w: &mut Buffer, cx: &mut Context<'_>, item: &clean::Item, items: &[clean::Item]) {
@@ -1432,67 +1442,68 @@ fn item_type_alias(w: &mut Buffer, cx: &mut Context<'_>, it: &clean::Item, t: &c
     }
 }
 
-fn item_union(w: &mut Buffer, cx: &mut Context<'_>, it: &clean::Item, s: &clean::Union) {
-    item_template!(
-        #[template(path = "item_union.html")]
-        struct ItemUnion<'a, 'cx> {
-            cx: RefCell<&'a mut Context<'cx>>,
-            it: &'a clean::Item,
-            s: &'a clean::Union,
-        },
-        methods = [document, document_type_layout, render_attributes_in_pre, render_assoc_items]
-    );
+// Only to be used by the `item_union()` function
+item_template!(
+    #[template(path = "item_union.html")]
+    struct ItemUnion<'a, 'cx> {
+        cx: RefCell<&'a mut Context<'cx>>,
+        it: &'a clean::Item,
+        s: &'a clean::Union,
+    },
+    methods = [document, document_type_layout, render_attributes_in_pre, render_assoc_items]
+);
 
-    impl<'a, 'cx: 'a> ItemUnion<'a, 'cx> {
-        fn render_union<'b>(&'b self) -> impl fmt::Display + Captures<'a> + 'b + Captures<'cx> {
-            display_fn(move |f| {
-                let cx = self.cx.borrow_mut();
-                let v = render_union(self.it, Some(&self.s.generics), &self.s.fields, *cx);
-                write!(f, "{v}")
-            })
-        }
-
-        fn document_field<'b>(
-            &'b self,
-            field: &'a clean::Item,
-        ) -> impl fmt::Display + Captures<'a> + 'b + Captures<'cx> {
-            display_fn(move |f| {
-                let mut cx = self.cx.borrow_mut();
-                let v = document(*cx, field, Some(self.it), HeadingOffset::H3);
-                write!(f, "{v}")
-            })
-        }
-
-        fn stability_field(&self, field: &clean::Item) -> Option<String> {
-            let cx = self.cx.borrow();
-            field.stability_class(cx.tcx())
-        }
-
-        fn print_ty<'b>(
-            &'b self,
-            ty: &'a clean::Type,
-        ) -> impl fmt::Display + Captures<'a> + 'b + Captures<'cx> {
-            display_fn(move |f| {
-                let cx = self.cx.borrow();
-                let v = ty.print(*cx);
-                write!(f, "{v}")
-            })
-        }
-
-        fn fields_iter(
-            &self,
-        ) -> std::iter::Peekable<impl Iterator<Item = (&'a clean::Item, &'a clean::Type)>> {
-            self.s
-                .fields
-                .iter()
-                .filter_map(|f| match *f.kind {
-                    clean::StructFieldItem(ref ty) => Some((f, ty)),
-                    _ => None,
-                })
-                .peekable()
-        }
+impl<'a, 'cx: 'a> ItemUnion<'a, 'cx> {
+    fn render_union<'b>(&'b self) -> impl fmt::Display + Captures<'a> + 'b + Captures<'cx> {
+        display_fn(move |f| {
+            let cx = self.cx.borrow_mut();
+            let v = render_union(self.it, Some(&self.s.generics), &self.s.fields, *cx);
+            write!(f, "{v}")
+        })
     }
 
+    fn document_field<'b>(
+        &'b self,
+        field: &'a clean::Item,
+    ) -> impl fmt::Display + Captures<'a> + 'b + Captures<'cx> {
+        display_fn(move |f| {
+            let mut cx = self.cx.borrow_mut();
+            let v = document(*cx, field, Some(self.it), HeadingOffset::H3);
+            write!(f, "{v}")
+        })
+    }
+
+    fn stability_field(&self, field: &clean::Item) -> Option<String> {
+        let cx = self.cx.borrow();
+        field.stability_class(cx.tcx())
+    }
+
+    fn print_ty<'b>(
+        &'b self,
+        ty: &'a clean::Type,
+    ) -> impl fmt::Display + Captures<'a> + 'b + Captures<'cx> {
+        display_fn(move |f| {
+            let cx = self.cx.borrow();
+            let v = ty.print(*cx);
+            write!(f, "{v}")
+        })
+    }
+
+    fn fields_iter(
+        &self,
+    ) -> std::iter::Peekable<impl Iterator<Item = (&'a clean::Item, &'a clean::Type)>> {
+        self.s
+            .fields
+            .iter()
+            .filter_map(|f| match *f.kind {
+                clean::StructFieldItem(ref ty) => Some((f, ty)),
+                _ => None,
+            })
+            .peekable()
+    }
+}
+
+fn item_union(w: &mut Buffer, cx: &mut Context<'_>, it: &clean::Item, s: &clean::Union) {
     ItemUnion { cx: RefCell::new(cx), it, s }.render_into(w).unwrap();
 }
 
@@ -1524,26 +1535,56 @@ fn print_tuple_struct_fields<'a, 'cx: 'a>(
 fn item_enum(w: &mut Buffer, cx: &mut Context<'_>, it: &clean::Item, e: &clean::Enum) {
     let tcx = cx.tcx();
     let count_variants = e.variants().count();
-    wrap_item(w, |w| {
-        render_attributes_in_code(w, it, cx);
+    wrap_item(w, |mut w| {
         write!(
             w,
-            "{}enum {}{}",
+            "{attrs}{}enum {}{}",
             visibility_print_with_space(it.visibility(tcx), it.item_id, cx),
             it.name.unwrap(),
             e.generics.print(cx),
+            attrs = render_attributes_in_code(it, tcx),
         );
 
-        render_enum_fields(
-            w,
-            cx,
-            Some(&e.generics),
-            &e.variants,
-            count_variants,
-            e.has_stripped_entries(),
-            it.is_non_exhaustive(),
-            it.def_id().unwrap(),
-        );
+        let variants_stripped = e.has_stripped_entries();
+        if count_variants == 0 && !variants_stripped {
+            w.write_str("{}");
+        } else {
+            w.write_str("{\n");
+            let toggle = should_hide_fields(count_variants);
+            if toggle {
+                toggle_open(&mut w, format_args!("{} variants", count_variants));
+            }
+            for v in e.variants() {
+                w.write_str("    ");
+                let name = v.name.unwrap();
+                match *v.kind {
+                    // FIXME(#101337): Show discriminant
+                    clean::VariantItem(ref var) => match var.kind {
+                        clean::VariantKind::CLike => write!(w, "{}", name),
+                        clean::VariantKind::Tuple(ref s) => {
+                            write!(w, "{name}({})", print_tuple_struct_fields(cx, s),);
+                        }
+                        clean::VariantKind::Struct(ref s) => {
+                            write!(
+                                w,
+                                "{}",
+                                render_struct(v, None, None, &s.fields, "    ", false, cx)
+                            );
+                        }
+                    },
+                    _ => unreachable!(),
+                }
+                w.write_str(",\n");
+            }
+
+            if variants_stripped && !it.is_non_exhaustive() {
+                w.write_str("    // some variants omitted\n");
+            }
+            if toggle {
+                toggle_close(&mut w);
+            }
+            w.write_str("}");
+        }
     });
 
     write!(w, "{}", document(cx, it, None, HeadingOffset::H2));
@@ -1844,11 +1885,11 @@ fn item_primitive(w: &mut impl fmt::Write, cx: &mut Context<'_>, it: &clean::Ite
 fn item_constant(w: &mut Buffer, cx: &mut Context<'_>, it: &clean::Item, c: &clean::Constant) {
     wrap_item(w, |w| {
         let tcx = cx.tcx();
-        render_attributes_in_code(w, it, cx);
 
         write!(
             w,
-            "{vis}const {name}{generics}: {typ}{where_clause}",
+            "{attrs}{vis}const {name}: {typ}",
+            attrs = render_attributes_in_code(it, tcx),
             vis = visibility_print_with_space(it.visibility(tcx), it.item_id, cx),
             name = it.name.unwrap(),
             generics = c.generics.print(cx),
@@ -1891,72 +1932,94 @@ fn item_constant(w: &mut Buffer, cx: &mut Context<'_>, it: &clean::Item, c: &cle
     write!(w, "{}", document(cx, it, None, HeadingOffset::H2))
 }
 
-fn item_struct(w: &mut Buffer, cx: &mut Context<'_>, it: &clean::Item, s: &clean::Struct) {
-    wrap_item(w, |w| {
-        render_attributes_in_code(w, it, cx);
-        render_struct(w, it, Some(&s.generics), s.ctor_kind, &s.fields, "", true, cx);
-    });
+// Only to be used by the `item_struct()` function
+item_template!(
+    #[template(path = "item_struct.html")]
+    struct ItemStruct<'a, 'cx> {
+        cx: RefCell<&'a mut Context<'cx>>,
+        it: &'a clean::Item,
+        s: &'a clean::Struct,
+        should_render_fields: bool,
+    },
+    methods = [render_attributes_in_code, document, render_assoc_items, document_type_layout]
+);
 
-    write!(w, "{}", document(cx, it, None, HeadingOffset::H2));
+impl<'a, 'cx: 'a> ItemStruct<'a, 'cx> {
+    fn new(
+        cx: std::cell::RefCell<&'a mut Context<'cx>>,
+        it: &'a clean::Item,
+        s: &'a clean::Struct,
+    ) -> Self {
+        let should_render_fields = matches!(s.ctor_kind, None | Some(CtorKind::Fn))
+            && struct_field_items(s).peekable().peek().is_some();
+        Self { cx, it, s, should_render_fields }
+    }
 
-    item_fields(w, cx, it, &s.fields, s.ctor_kind);
+    fn render_struct<'b>(&'b self) -> impl fmt::Display + Captures<'a> + 'b + Captures<'cx> {
+        display_fn(move |f| {
+            let cx = self.cx.borrow();
+            let v = render_struct(
+                self.it,
+                Some(&self.s.generics),
+                self.s.ctor_kind,
+                &self.s.fields,
+                "",
+                true,
+                *cx,
+            );
+            write!(f, "{v}")
+        })
+    }
 
-    let def_id = it.item_id.expect_def_id();
-    write!(w, "{}", render_assoc_items(cx, it, def_id, AssocItemRender::All));
-    write!(w, "{}", document_type_layout(cx, def_id));
+    fn struct_field_items_iter<'b>(
+        &'b self,
+    ) -> impl Iterator<Item = ItemStructField<'a>> + Captures<'a> + 'b + Captures<'cx> {
+        struct_field_items(self.s).enumerate().map(|(index, (item, ty))| {
+            let mut cx = self.cx.borrow_mut();
+            let name = item.name.map_or_else(|| index.to_string(), |sym| sym.as_str().to_string());
+            let id = cx.derive_id(format!("{}.{}", ItemType::StructField, name));
+            let ty = ty.print(*cx).to_string();
+            ItemStructField { item, name, id, ty }
+        })
+    }
+
+    fn document_field<'b>(
+        &'b self,
+        field: &'b clean::Item,
+    ) -> impl fmt::Display + Captures<'a> + 'b + Captures<'cx> {
+        display_fn(move |f| {
+            let mut cx = self.cx.borrow_mut();
+            let v = document(*cx, field, Some(self.it), HeadingOffset::H3);
+            write!(f, "{v}")
+        })
+    }
 }
 
-fn item_fields(
-    w: &mut Buffer,
-    cx: &mut Context<'_>,
-    it: &clean::Item,
-    fields: &Vec<clean::Item>,
-    ctor_kind: Option<CtorKind>,
-) {
-    let mut fields = fields
-        .iter()
-        .filter_map(|f| match *f.kind {
-            clean::StructFieldItem(ref ty) => Some((f, ty)),
-            _ => None,
-        })
-        .peekable();
-    if let None | Some(CtorKind::Fn) = ctor_kind {
-        if fields.peek().is_some() {
-            write!(
-                w,
-                "<h2 id=\"fields\" class=\"fields small-section-header\">\
-                     {}{}<a href=\"#fields\" class=\"anchor\">§</a>\
-                 </h2>\
-                 {}",
-                if ctor_kind.is_none() { "Fields" } else { "Tuple Fields" },
-                document_non_exhaustive_header(it),
-                document_non_exhaustive(it)
-            );
-            for (index, (field, ty)) in fields.enumerate() {
-                let field_name =
-                    field.name.map_or_else(|| index.to_string(), |sym| sym.as_str().to_string());
-                let id = cx.derive_id(format!("{typ}.{field_name}", typ = ItemType::StructField));
-                write!(
-                    w,
-                    "<span id=\"{id}\" class=\"{item_type} small-section-header\">\
-                         <a href=\"#{id}\" class=\"anchor field\">§</a>\
-                         <code>{field_name}: {ty}</code>\
-                     </span>",
-                    item_type = ItemType::StructField,
-                    ty = ty.print(cx)
-                );
-                write!(w, "{}", document(cx, field, Some(it), HeadingOffset::H3));
-            }
-        }
-    }
+// Only to be used by the `ItemStruct` struct
+struct ItemStructField<'a> {
+    item: &'a clean::Item,
+    name: String,
+    id: String,
+    ty: String,
+}
+
+fn item_struct(w: &mut Buffer, cx: &mut Context<'_>, it: &clean::Item, s: &clean::Struct) {
+    ItemStruct::new(std::cell::RefCell::new(cx), it, s).render_into(w).unwrap();
+}
+
+fn struct_field_items(s: &clean::Struct) -> impl Iterator<Item = (&clean::Item, &clean::Type)> {
+    s.fields.iter().filter_map(|item| match *item.kind {
+        clean::StructFieldItem(ref ty) => Some((item, ty)),
+        _ => None,
+    })
 }
 
 fn item_static(w: &mut impl fmt::Write, cx: &mut Context<'_>, it: &clean::Item, s: &clean::Static) {
     wrap_item(w, |buffer| {
-        render_attributes_in_code(buffer, it, cx);
         write!(
             buffer,
-            "{vis}static {mutability}{name}: {typ}",
+            "{attrs}{vis}static {mutability}{name}: {typ}",
+            attrs = render_attributes_in_code(it, cx.tcx()),
             vis = visibility_print_with_space(it.visibility(cx.tcx()), it.item_id, cx),
             mutability = s.mutability.print_with_space(),
             name = it.name.unwrap(),
@@ -1971,12 +2034,12 @@ fn item_static(w: &mut impl fmt::Write, cx: &mut Context<'_>, it: &clean::Item, 
 fn item_foreign_type(w: &mut impl fmt::Write, cx: &mut Context<'_>, it: &clean::Item) {
     wrap_item(w, |buffer| {
         buffer.write_str("extern {\n").unwrap();
-        render_attributes_in_code(buffer, it, cx);
         write!(
             buffer,
-            "    {}type {};\n}}",
+            "{attrs}    {}type {};\n}}",
             visibility_print_with_space(it.visibility(cx.tcx()), it.item_id, cx),
             it.name.unwrap(),
+            attrs = render_attributes_in_code(it, cx.tcx()),
         )
         .unwrap();
     });
@@ -2155,7 +2218,7 @@ fn render_union<'a, 'cx: 'a>(
             f.write_str(" ")?;
         }
 
-        write!(f, "{{\n")?;
+        f.write_str("{\n")?;
         let count_fields =
             fields.iter().filter(|field| matches!(*field.kind, clean::StructFieldItem(..))).count();
         let toggle = should_hide_fields(count_fields);
@@ -2176,7 +2239,7 @@ fn render_union<'a, 'cx: 'a>(
         }
 
         if it.has_stripped_entries().unwrap() {
-            write!(f, "    /* private fields */\n")?;
+            f.write_str("    /* private fields */\n")?;
         }
         if toggle {
             toggle_close(&mut f);
@@ -2186,109 +2249,86 @@ fn render_union<'a, 'cx: 'a>(
     })
 }
 
-fn render_struct(
-    w: &mut Buffer,
-    it: &clean::Item,
-    g: Option<&clean::Generics>,
+fn render_struct<'a, 'cx: 'a>(
+    it: &'a clean::Item,
+    g: Option<&'a clean::Generics>,
     ty: Option<CtorKind>,
-    fields: &[clean::Item],
-    tab: &str,
+    fields: &'a [clean::Item],
+    tab: &'a str,
     structhead: bool,
-    cx: &Context<'_>,
-) {
-    let tcx = cx.tcx();
-    write!(
-        w,
-        "{}{}{}",
-        visibility_print_with_space(it.visibility(tcx), it.item_id, cx),
-        if structhead { "struct " } else { "" },
-        it.name.unwrap()
-    );
-    if let Some(g) = g {
-        write!(w, "{}", g.print(cx))
-    }
-    render_struct_fields(
-        w,
-        g,
-        ty,
-        fields,
-        tab,
-        structhead,
-        it.has_stripped_entries().unwrap_or(false),
-        cx,
-    )
-}
+    cx: &'a Context<'cx>,
+) -> impl fmt::Display + 'a + Captures<'cx> {
+    display_fn(move |mut f| {
+        let tcx = cx.tcx();
+        write!(
+            f,
+            "{}{}{}",
+            visibility_print_with_space(it.visibility(tcx), it.item_id, cx),
+            if structhead { "struct " } else { "" },
+            it.name.unwrap()
+        )?;
 
-fn render_struct_fields(
-    mut w: &mut Buffer,
-    g: Option<&clean::Generics>,
-    ty: Option<CtorKind>,
-    fields: &[clean::Item],
-    tab: &str,
-    structhead: bool,
-    has_stripped_entries: bool,
-    cx: &Context<'_>,
-) {
-    let tcx = cx.tcx();
-    match ty {
-        None => {
-            let where_displayed =
-                g.map(|g| print_where_clause_and_check(w, g, cx)).unwrap_or(false);
-
-            // If there wasn't a `where` clause, we add a whitespace.
-            if !where_displayed {
-                w.write_str(" {");
-            } else {
-                w.write_str("{");
-            }
-            let count_fields =
-                fields.iter().filter(|f| matches!(*f.kind, clean::StructFieldItem(..))).count();
-            let has_visible_fields = count_fields > 0;
-            let toggle = should_hide_fields(count_fields);
-            if toggle {
-                toggle_open(&mut w, format_args!("{count_fields} fields"));
-            }
-            for field in fields {
-                if let clean::StructFieldItem(ref ty) = *field.kind {
-                    write!(
-                        w,
-                        "\n{tab}    {vis}{name}: {ty},",
-                        vis = visibility_print_with_space(field.visibility(tcx), field.item_id, cx),
-                        name = field.name.unwrap(),
-                        ty = ty.print(cx),
-                    );
-                }
-            }
-
-            if has_visible_fields {
-                if has_stripped_entries {
-                    write!(w, "\n{tab}    /* private fields */");
-                }
-                write!(w, "\n{tab}");
-            } else if has_stripped_entries {
-                write!(w, " /* private fields */ ");
-            }
-            if toggle {
-                toggle_close(&mut w);
-            }
-            w.write_str("}");
+        if let Some(g) = g {
+            write!(f, "{}", g.print(cx))?;
         }
-        Some(CtorKind::Fn) => {
-            w.write_str("(");
-            if fields.iter().all(|field| {
-                matches!(*field.kind, clean::StrippedItem(box clean::StructFieldItem(..)))
-            }) {
-                write!(w, "/* private fields */");
-            } else {
+
+        match ty {
+            None => {
+                let mut buf = Buffer::html();
+                let where_displayed =
+                    g.map(|g| print_where_clause_and_check(&mut buf, g, cx)).unwrap_or(false);
+
+                // If there wasn't a `where` clause, we add a whitespace.
+                write!(f, "{}{}{{", buf.into_inner(), if !where_displayed { " " } else { "" })?;
+
+                let count_fields = fields
+                    .iter()
+                    .filter(|item| matches!(*item.kind, clean::StructFieldItem(..)))
+                    .count();
+                let has_visible_fields = count_fields > 0;
+                let toggle = should_hide_fields(count_fields);
+                if toggle {
+                    toggle_open(&mut f, format_args!("{} fields", count_fields));
+                }
+                for field in fields {
+                    if let clean::StructFieldItem(ref ty) = *field.kind {
+                        write!(
+                            f,
+                            "\n{}    {}{}: {},",
+                            tab,
+                            visibility_print_with_space(field.visibility(tcx), field.item_id, cx),
+                            field.name.unwrap(),
+                            ty.print(cx),
+                        )?;
+                    }
+                }
+
+                if has_visible_fields {
+                    if it.has_stripped_entries().unwrap() {
+                        write!(f, "\n{}    /* private fields */", tab)?;
+                    }
+                    write!(f, "\n{}", tab)?;
+                } else if it.has_stripped_entries().unwrap() {
+                    f.write_str(" /* private fields */ ")?;
+                }
+                if toggle {
+                    toggle_close(&mut f);
+                }
+                f.write_str("}")?;
+            }
+            Some(CtorKind::Fn) => {
+                f.write_str("(")?;
                 for (i, field) in fields.iter().enumerate() {
                     if i > 0 {
-                        w.write_str(", ");
+                        f.write_str(", ")?;
                     }
                     match *field.kind {
-                        clean::StrippedItem(box clean::StructFieldItem(..)) => write!(w, "_"),
+                        clean::StrippedItem(box clean::StructFieldItem(..)) => {
+                            f.write_str("_")?;
+                        }
                         clean::StructFieldItem(ref ty) => {
                             write!(
-                                w,
+                                f,
                                 "{}{}",
                                 visibility_print_with_space(
                                     field.visibility(tcx),
@@ -2296,29 +2336,30 @@ fn render_struct_fields(
                                     cx
                                 ),
                                 ty.print(cx),
-                            )
+                            )?;
                         }
                         _ => unreachable!(),
                     }
                 }
+                f.write_str(")")?;
+                if let Some(g) = g {
+                    write!(f, "{}", print_where_clause(g, cx, 0, Ending::NoNewline))?;
+                }
+                // We only want a ";" when we are displaying a tuple struct, not a variant tuple struct.
+                if structhead {
+                    f.write_str(";")?;
+                }
             }
-            w.write_str(")");
-            if let Some(g) = g {
-                write!(w, "{}", print_where_clause(g, cx, 0, Ending::NoNewline));
-            }
-            // We only want a ";" when we are displaying a tuple struct, not a variant tuple struct.
-            if structhead {
-                w.write_str(";");
+            Some(CtorKind::Const) => {
+                // Needed for PhantomData.
+                if let Some(g) = g {
+                    write!(f, "{}", print_where_clause(g, cx, 0, Ending::NoNewline))?;
+                }
+                f.write_str(";")?;
             }
         }
-        Some(CtorKind::Const) => {
-            // Needed for PhantomData.
-            if let Some(g) = g {
-                write!(w, "{}", print_where_clause(g, cx, 0, Ending::NoNewline));
-            }
-            w.write_str(";");
-        }
-    }
+        Ok(())
+    })
 }
 
 fn document_non_exhaustive_header(item: &clean::Item) -> &str {
