@@ -29,6 +29,17 @@ pub(crate) fn new_code_ident() -> syn::Ident {
     })
 }
 
+pub(crate) fn convert_to_litstr(lit: &proc_macro2::Literal) -> LitStr {
+    let s = format!("{}", lit);
+    let s = if s.starts_with("r#\"") && s.ends_with("\"#") && s.len() >= 5 {
+        s[3..s.len() - 2].to_string()
+    } else {
+        s[1..s.len() - 1].to_string()
+    };
+
+    LitStr::new(&s, lit.span())
+}
+
 /// Checks whether the type name of `ty` matches `name`.
 ///
 /// Given some struct at `a::b::c::Foo`, this will return true for `c::Foo`, `b::c::Foo`, or
@@ -601,6 +612,9 @@ pub(super) struct SubdiagnosticVariant {
     pub(super) kind: SubdiagnosticKind,
     pub(super) slug: Option<Path>,
     pub(super) no_span: bool,
+    /// A subdiagnostic can have a raw_label field, e.g. `#[help("some text")]`.
+    /// if `slug` is None, this field need to be set.
+    pub(super) raw_label: Option<LitStr>,
 }
 
 impl SubdiagnosticVariant {
@@ -617,7 +631,6 @@ impl SubdiagnosticVariant {
         }
 
         let span = attr.span().unwrap();
-
         let name = attr.path().segments.last().unwrap().ident.to_string();
         let name = name.as_str();
 
@@ -667,10 +680,25 @@ impl SubdiagnosticVariant {
             }
         };
 
+        // new format without slug: #[label("this is the text")]
+        let keys = vec!["note", "help", "label", "warning"];
+        for key in keys {
+            if attr.path().is_ident(key) {
+                if let Ok(text) = attr.parse_args::<syn::LitStr>() {
+                    return Ok(Some(SubdiagnosticVariant {
+                        kind,
+                        slug: None,
+                        no_span: false,
+                        raw_label: Some(text),
+                    }));
+                }
+            }
+        }
+
         let list = match &attr.meta {
             Meta::List(list) => {
                 // An attribute with properties, such as `#[suggestion(code = "...")]` or
-                // `#[error(some::slug)]`
+                // `#[error(some::slug)]` or `#[error("message")]`
                 list
             }
             Meta::Path(_) => {
@@ -685,7 +713,12 @@ impl SubdiagnosticVariant {
                     | SubdiagnosticKind::Help
                     | SubdiagnosticKind::Warn
                     | SubdiagnosticKind::MultipartSuggestion { .. } => {
-                        return Ok(Some(SubdiagnosticVariant { kind, slug: None, no_span: false }));
+                        return Ok(Some(SubdiagnosticVariant {
+                            kind,
+                            slug: None,
+                            no_span: false,
+                            raw_label: None,
+                        }));
                     }
                     SubdiagnosticKind::Suggestion { .. } => {
                         throw_span_err!(span, "suggestion without `code = \"...\"`")
@@ -699,6 +732,7 @@ impl SubdiagnosticVariant {
 
         let mut code = None;
         let mut suggestion_kind = None;
+        let mut suggestion_label = None;
 
         let mut first = true;
         let mut slug = None;
@@ -740,6 +774,9 @@ impl SubdiagnosticVariant {
             let input = nested.input;
 
             match (nested_name, &mut kind) {
+                ("label", SubdiagnosticKind::Suggestion { .. } | SubdiagnosticKind::MultipartSuggestion { ..}) => {
+                    suggestion_label = Some(get_string!());
+                }
                 ("code", SubdiagnosticKind::Suggestion { code_field, .. }) => {
                     let code_init = build_suggestion_code(
                         code_field,
@@ -840,7 +877,7 @@ impl SubdiagnosticVariant {
             | SubdiagnosticKind::Warn => {}
         }
 
-        Ok(Some(SubdiagnosticVariant { kind, slug, no_span }))
+        Ok(Some(SubdiagnosticVariant { kind, slug, no_span, raw_label: suggestion_label }))
     }
 }
 

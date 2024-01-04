@@ -18,7 +18,6 @@ use crate::errors::{
     UnexpectedConstInGenericParam, UnexpectedConstParamDeclaration,
     UnexpectedConstParamDeclarationSugg, UnmatchedAngleBrackets, UseEqInstead, WrapType,
 };
-use crate::fluent_generated as fluent;
 use crate::parser;
 use crate::parser::attr::InnerAttrPolicy;
 use rustc_ast as ast;
@@ -1214,7 +1213,7 @@ impl<'a> Parser<'a> {
                     if self.eat(&token::Gt) {
                         e.span_suggestion_verbose(
                             binop.span.shrink_to_lo(),
-                            fluent::parse_sugg_turbofish_syntax,
+                            "use `::<...>` instead of `<...>` to specify lifetime, type, or const arguments",
                             "::",
                             Applicability::MaybeIncorrect,
                         )

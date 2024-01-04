@@ -25,6 +25,7 @@ use rustc_ast::{Arm, BlockCheckMode, Expr, ExprKind, Label, Movability, RangeLim
 use rustc_ast::{ClosureBinder, MetaItemLit, StmtKind};
 use rustc_ast_pretty::pprust;
 use rustc_data_structures::stack::ensure_sufficient_stack;
+use rustc_errors::DiagnosticMessage;
 use rustc_errors::{
     AddToDiagnostic, Applicability, Diagnostic, DiagnosticBuilder, PResult, StashKey,
 };
@@ -787,6 +788,7 @@ impl<'a> Parser<'a> {
                                     r#type: path,
                                     args: args_span,
                                     suggestion,
+                                    action: "comparing".to_string(),
                                 })
                             }
                             token::BinOp(token::Shl) => {
@@ -795,6 +797,7 @@ impl<'a> Parser<'a> {
                                     r#type: path,
                                     args: args_span,
                                     suggestion,
+                                    action: "shifting".to_string(),
                                 })
                             }
                             _ => {
@@ -3704,13 +3707,13 @@ pub(crate) enum ForbiddenLetReason {
     /// `let` is not valid and the source environment is not important
     OtherForbidden,
     /// A let chain with the `||` operator
-    #[note(parse_not_supported_or)]
+    #[note("`||` operators are not supported in let chain expressions")]
     NotSupportedOr(#[primary_span] Span),
     /// A let chain with invalid parentheses
     ///
     /// For example, `let 1 = 1 && (expr && expr)` is allowed
     /// but `(let 1 = 1 && (let 1 = 1 && (let 1 = 1))) && let a = 1` is not
-    #[note(parse_not_supported_parentheses)]
+    #[note("`let`s wrapped in parentheses are not supported in a context with let chains")]
     NotSupportedParentheses(#[primary_span] Span),
 }
 
