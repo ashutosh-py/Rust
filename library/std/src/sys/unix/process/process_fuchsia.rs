@@ -165,6 +165,16 @@ impl Process {
         Ok(())
     }
 
+    pub fn interrupt(&mut self) -> io::Result<()> {
+        use crate::sys::process::zircon::*;
+
+        unsafe {
+            zx_cvt(zx_task_kill(self.handle.raw()))?;
+        }
+
+        Ok(())
+    }
+
     pub fn wait(&mut self) -> io::Result<ExitStatus> {
         use crate::sys::process::zircon::*;
 
