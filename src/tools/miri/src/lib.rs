@@ -4,7 +4,6 @@
 #![feature(map_try_insert)]
 #![feature(never_type)]
 #![feature(try_blocks)]
-#![feature(io_error_more)]
 #![feature(variant_count)]
 #![feature(yeet_expr)]
 #![feature(nonzero_ops)]
