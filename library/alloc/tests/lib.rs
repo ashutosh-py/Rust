@@ -29,6 +29,7 @@
 #![feature(iter_advance_by)]
 #![feature(iter_next_chunk)]
 #![feature(round_char_boundary)]
+#![feature(string_replace_in_place)]
 #![feature(slice_group_by)]
 #![feature(slice_partition_dedup)]
 #![feature(string_remove_matches)]
