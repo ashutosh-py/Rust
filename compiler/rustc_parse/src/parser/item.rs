@@ -1724,7 +1724,6 @@ impl<'a> Parser<'a> {
                     // encountered another parse error.
                     snapshot = Some(p.create_snapshot_for_diagnostic());
                 }
-                let lo = p.token.span;
                 let vis = match p.parse_visibility(FollowedByType::Yes) {
                     Ok(vis) => vis,
                     Err(err) => {
@@ -1746,7 +1745,6 @@ impl<'a> Parser<'a> {
 
                 Ok((
                     FieldDef {
-                        span: lo.to(ty.span),
                         vis,
                         ident: None,
                         id: DUMMY_NODE_ID,
@@ -1932,15 +1930,7 @@ impl<'a> Parser<'a> {
             let sp = ty.span.shrink_to_hi().to(const_expr.value.span);
             self.dcx().emit_err(errors::EqualsStructDefault { span: sp });
         }
-        Ok(FieldDef {
-            span: lo.to(self.prev_token.span),
-            ident: Some(name),
-            vis,
-            id: DUMMY_NODE_ID,
-            ty,
-            attrs,
-            is_placeholder: false,
-        })
+        Ok(FieldDef { ident: Some(name), vis, id: DUMMY_NODE_ID, ty, attrs, is_placeholder: false })
     }
 
     /// Parses a field identifier. Specialized version of `parse_ident_common`

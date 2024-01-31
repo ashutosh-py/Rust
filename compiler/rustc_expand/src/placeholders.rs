@@ -167,7 +167,6 @@ pub fn placeholder(
             attrs: Default::default(),
             id,
             ident: None,
-            span,
             ty: ty(),
             vis,
             is_placeholder: true,

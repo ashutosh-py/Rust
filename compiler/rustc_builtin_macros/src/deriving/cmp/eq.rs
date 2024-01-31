@@ -70,7 +70,7 @@ fn cs_total_eq_assert(
                     cx,
                     &mut stmts,
                     field.ty.clone(),
-                    field.span,
+                    field.span(),
                     &[sym::cmp, sym::AssertParamIsEq],
                 );
             }
