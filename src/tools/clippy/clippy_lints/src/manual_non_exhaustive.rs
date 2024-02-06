@@ -136,7 +136,7 @@ impl EarlyLintPass for ManualNonExhaustiveStruct {
                                 Applicability::Unspecified,
                             );
                         }
-                        diag.span_help(field.span, "remove this field");
+                        diag.span_help(field.span(), "remove this field");
                     },
                 );
             }

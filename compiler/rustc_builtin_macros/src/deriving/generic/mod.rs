@@ -1432,7 +1432,7 @@ impl<'a> TraitDef<'a> {
         let mut named_idents = Vec::new();
         let mut just_spans = Vec::new();
         for field in struct_def.fields() {
-            let sp = field.span.with_ctxt(self.span.ctxt());
+            let sp = field.span().with_ctxt(self.span.ctxt());
             match field.ident {
                 Some(ident) => named_idents.push((ident, sp)),
                 _ => just_spans.push(sp),
@@ -1466,7 +1466,7 @@ impl<'a> TraitDef<'a> {
             .map(|prefix| {
                 let pieces_iter =
                     struct_def.fields().iter().enumerate().map(|(i, struct_field)| {
-                        let sp = struct_field.span.with_ctxt(self.span.ctxt());
+                        let sp = struct_field.span().with_ctxt(self.span.ctxt());
                         let ident = self.mk_pattern_ident(prefix, i);
                         let path = ident.with_span_pos(sp);
                         (
@@ -1528,7 +1528,7 @@ impl<'a> TraitDef<'a> {
             .map(|(i, struct_field)| {
                 // For this field, get an expr for each selflike_arg. E.g. for
                 // `PartialEq::eq`, one for each of `&self` and `other`.
-                let sp = struct_field.span.with_ctxt(self.span.ctxt());
+                let sp = struct_field.span().with_ctxt(self.span.ctxt());
                 let mut exprs: Vec<_> = mk_exprs(i, struct_field, sp);
                 let self_expr = exprs.remove(0);
                 let other_selflike_exprs = exprs;
@@ -1583,7 +1583,7 @@ impl<'a> TraitDef<'a> {
                         ast::ExprKind::Field(
                             selflike_arg.clone(),
                             struct_field.ident.unwrap_or_else(|| {
-                                Ident::from_str_and_span(&i.to_string(), struct_field.span)
+                                Ident::from_str_and_span(&i.to_string(), struct_field.span())
                             }),
                         ),
                     );
@@ -1631,7 +1631,7 @@ impl<'a> TraitDef<'a> {
                         } else {
                             // Wrap the expression in `{...}`, causing a copy.
                             field_expr = cx.expr_block(
-                                cx.block(struct_field.span, thin_vec![cx.stmt_expr(field_expr)]),
+                                cx.block(struct_field.span(), thin_vec![cx.stmt_expr(field_expr)]),
                             );
                         }
                     }

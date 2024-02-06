@@ -306,8 +306,10 @@ impl<'a> AstValidator<'a> {
         if let Some(ident) = field.ident
             && ident.name == kw::Underscore
         {
-            self.dcx()
-                .emit_err(errors::InvalidUnnamedField { span: field.span, ident_span: ident.span });
+            self.dcx().emit_err(errors::InvalidUnnamedField {
+                span: field.span(),
+                ident_span: ident.span,
+            });
         }
     }
 

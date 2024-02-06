@@ -116,7 +116,7 @@ fn cs_clone_simple(
                     cx,
                     &mut stmts,
                     field.ty.clone(),
-                    field.span,
+                    field.span(),
                     &[sym::clone, sym::AssertParamIsClone],
                 );
             }
