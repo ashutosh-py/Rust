@@ -246,7 +246,10 @@ unsafe impl<T> SliceIndex<[T]> for usize {
             "slice::get_unchecked_mut requires that the index is within the slice",
         );
         // SAFETY: see comments for `get_unchecked` above.
-        unsafe { slice.as_mut_ptr().add(self) }
+        unsafe {
+            crate::hint::assert_unchecked(self < slice.len());
+            slice.as_mut_ptr().add(self)
+        }
     }
 
     #[inline]
@@ -298,7 +301,10 @@ unsafe impl<T> SliceIndex<[T]> for ops::IndexRange {
         // cannot be longer than `isize::MAX`. They also guarantee that
         // `self` is in bounds of `slice` so `self` cannot overflow an `isize`,
         // so the call to `add` is safe.
-        unsafe { ptr::slice_from_raw_parts(slice.as_ptr().add(self.start()), self.len()) }
+        unsafe {
+            crate::hint::assert_unchecked(self.end() <= slice.len());
+            ptr::slice_from_raw_parts(slice.as_ptr().add(self.start()), self.len())
+        }
     }
 
     #[inline]
@@ -308,7 +314,10 @@ unsafe impl<T> SliceIndex<[T]> for ops::IndexRange {
             "slice::get_unchecked_mut requires that the index is within the slice",
         );
         // SAFETY: see comments for `get_unchecked` above.
-        unsafe { ptr::slice_from_raw_parts_mut(slice.as_mut_ptr().add(self.start()), self.len()) }
+        unsafe {
+            crate::hint::assert_unchecked(self.end() <= slice.len());
+            ptr::slice_from_raw_parts_mut(slice.as_mut_ptr().add(self.start()), self.len())
+        }
     }
 
     #[inline]
@@ -368,6 +377,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         // `self` is in bounds of `slice` so `self` cannot overflow an `isize`,
         // so the call to `add` is safe and the length calculation cannot overflow.
         unsafe {
+            crate::hint::assert_unchecked(self.end <= slice.len());
             let new_len = unchecked_sub(self.end, self.start);
             ptr::slice_from_raw_parts(slice.as_ptr().add(self.start), new_len)
         }
@@ -381,6 +391,7 @@ unsafe impl<T> SliceIndex<[T]> for ops::Range<usize> {
         );
         // SAFETY: see comments for `get_unchecked` above.
         unsafe {
+            crate::hint::assert_unchecked(self.end <= slice.len());
             let new_len = unchecked_sub(self.end, self.start);
             ptr::slice_from_raw_parts_mut(slice.as_mut_ptr().add(self.start), new_len)
         }
