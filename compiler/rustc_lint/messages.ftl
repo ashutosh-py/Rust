@@ -555,6 +555,10 @@ lint_unknown_lint =
 lint_unknown_tool_in_scoped_lint = unknown tool name `{$tool_name}` found in scoped lint: `{$tool_name}::{$lint_name}`
     .help = add `#![register_tool({$tool_name})]` to the crate root
 
+lint_unpredictable_fn_pointer_comparisons = function pointer comparisons do not produce meaningful results since their addresses are not guaranteed to be unique
+    .note_duplicated_fn = the address of the same function can very between different codegen units
+    .note_deduplicated_fn = furthermore, different functions could have the same address after being merged together
+
 lint_unsupported_group = `{$lint_group}` lint group is not supported with ´--force-warn´
 
 lint_untranslatable_diag = diagnostics should be created using translatable messages
