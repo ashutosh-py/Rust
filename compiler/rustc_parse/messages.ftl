@@ -180,8 +180,6 @@ parse_expect_eq_instead_of_eqeq = expected `=`, found `==`
 parse_expect_label_found_ident = expected a label, found an identifier
     .suggestion = labels start with a tick
 
-parse_expect_path = expected a path
-
 parse_expected_binding_left_of_at = left-hand side of `@` must be a binding
     .label_lhs = interpreted as a pattern, not a binding
     .label_rhs = also a pattern
@@ -273,8 +271,6 @@ parse_fn_ptr_with_generics = function pointer types may not have generic paramet
 
 parse_fn_trait_missing_paren = `Fn` bounds require arguments in parentheses
     .add_paren = add the missing parentheses
-
-parse_forgot_paren = perhaps you forgot parentheses?
 
 parse_found_expr_would_be_stmt = expected expression, found `{$token}`
     .label = expected expression
@@ -507,13 +503,6 @@ parse_maybe_recover_from_bad_qpath_stage_2 =
     missing angle brackets in associated item path
     .suggestion = types that don't start with an identifier need to be surrounded with angle brackets in qualified paths
 
-parse_maybe_recover_from_bad_type_plus =
-    expected a path on the left-hand side of `+`, not `{$ty}`
-
-parse_maybe_report_ambiguous_plus =
-    ambiguous `+` in a type
-    .suggestion = use parentheses to disambiguate
-
 parse_meta_bad_delim = wrong meta list delimiters
 parse_meta_bad_delim_suggestion = the delimiters should be `(` and `)`
 
@@ -718,7 +707,6 @@ parse_sugg_add_semi = add `;` here
 parse_sugg_change_inner_attr_to_outer = to annotate the {$item}, change the attribute from inner to outer style
 
 parse_sugg_change_this_to_semi = change this to `;`
-parse_sugg_escape_identifier = escape `{$ident_name}` to use it as an identifier
 
 parse_sugg_remove_comma = remove this comma
 parse_sugg_remove_leading_vert_in_pattern = remove the `|`

@@ -2,7 +2,7 @@
 
 use std::cell::RefCell;
 
-use crate::diagnostics::diagnostic_builder::DiagnosticDeriveKind;
+use crate::diagnostics::diagnostic_builder::{DiagnosticDeriveKind, SlugOrRawFluent};
 use crate::diagnostics::error::{span_err, DiagnosticDeriveError};
 use crate::diagnostics::utils::SetOnce;
 use proc_macro2::TokenStream;
@@ -28,6 +28,18 @@ impl<'a> DiagnosticDerive<'a> {
             let preamble = builder.preamble(variant);
             let body = builder.body(variant);
 
+            let args = if matches!(builder.slug.value_ref(), Some(SlugOrRawFluent::RawFluent(_, _))) {
+                let args = builder.args;
+                quote! {
+                    use rustc_data_structures::fx::FxHashMap;
+                    use rustc_errors::{DiagnosticArgName, DiagnosticArgValue, IntoDiagnosticArg};
+                    let mut args: FxHashMap<DiagnosticArgName, DiagnosticArgValue> = Default::default();
+                    #(#args)*
+                }
+            } else {
+                quote! {}
+            };
+
             let init = match builder.slug.value_ref() {
                 None => {
                     span_err(builder.span, "diagnostic slug not specified")
@@ -38,7 +50,7 @@ impl<'a> DiagnosticDerive<'a> {
                         .emit();
                     return DiagnosticDeriveError::ErrorHandled.to_compile_error();
                 }
-                Some(slug)
+                Some(SlugOrRawFluent::Slug(slug))
                     if let Some(Mismatch { slug_name, crate_name, slug_prefix }) =
                         Mismatch::check(slug) =>
                 {
@@ -48,7 +60,7 @@ impl<'a> DiagnosticDerive<'a> {
                         .emit();
                     return DiagnosticDeriveError::ErrorHandled.to_compile_error();
                 }
-                Some(slug) => {
+                Some(SlugOrRawFluent::Slug(slug)) => {
                     slugs.borrow_mut().push(slug.clone());
                     quote! {
                         let mut diag = rustc_errors::DiagnosticBuilder::new(
@@ -58,10 +70,21 @@ impl<'a> DiagnosticDerive<'a> {
                         );
                     }
                 }
+                Some(SlugOrRawFluent::RawFluent(slug, raw)) => {
+                    quote! {
+                        let raw = dcx.raw_translate(#slug, #raw, args.iter());
+                        let mut diag = rustc_errors::DiagnosticBuilder::new(
+                            dcx,
+                            level,
+                            raw,
+                        );
+                    }
+                }
             };
 
             let formatting_init = &builder.formatting_init;
             quote! {
+                #args
                 #init
                 #formatting_init
                 #preamble
@@ -78,6 +101,7 @@ impl<'a> DiagnosticDerive<'a> {
                 where G: rustc_errors::EmissionGuarantee
             {
 
+                #[allow(rustc::potential_query_instability)]
                 #[track_caller]
                 fn into_diagnostic(
                     self,
@@ -136,7 +160,7 @@ impl<'a> LintDiagnosticDerive<'a> {
                         .emit();
                     DiagnosticDeriveError::ErrorHandled.to_compile_error()
                 }
-                Some(slug)
+                Some(SlugOrRawFluent::Slug(slug))
                     if let Some(Mismatch { slug_name, crate_name, slug_prefix }) =
                         Mismatch::check(slug) =>
                 {
@@ -146,10 +170,15 @@ impl<'a> LintDiagnosticDerive<'a> {
                         .emit();
                     DiagnosticDeriveError::ErrorHandled.to_compile_error()
                 }
-                Some(slug) => {
+                Some(SlugOrRawFluent::Slug(slug)) => {
                     slugs.borrow_mut().push(slug.clone());
                     quote! {
                         crate::fluent_generated::#slug.into()
+                    }
+                }
+                Some(SlugOrRawFluent::RawFluent(_, raw)) => {
+                    quote! {
+                        #raw
                     }
                 }
             }

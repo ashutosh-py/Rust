@@ -4,7 +4,7 @@ use rustc_ast::token::Token;
 use rustc_ast::{Path, Visibility};
 use rustc_errors::{
     codes::*, AddToDiagnostic, Applicability, DiagCtxt, Diagnostic, DiagnosticBuilder,
-    IntoDiagnostic, Level, SubdiagnosticMessageOp,
+    IntoDiagnostic, Level,
 };
 use rustc_macros::{Diagnostic, Subdiagnostic};
 use rustc_session::errors::ExprParenthesesNeeded;
@@ -16,16 +16,16 @@ use crate::fluent_generated as fluent;
 use crate::parser::{ForbiddenLetReason, TokenDescription};
 
 #[derive(Diagnostic)]
-#[diag(parse_maybe_report_ambiguous_plus)]
+#[diag_raw(message = "ambiguous `+` in a type")]
 pub(crate) struct AmbiguousPlus {
     pub sum_ty: String,
     #[primary_span]
-    #[suggestion(code = "({sum_ty})")]
+    #[suggestion(message = "use parentheses to disambiguate", code = "({sum_ty})")]
     pub span: Span,
 }
 
 #[derive(Diagnostic)]
-#[diag(parse_maybe_recover_from_bad_type_plus, code = E0178)]
+#[diag_raw(message = "expected a path on the left-hand side of `+`, not `{$ty}`", code = E0178)]
 pub(crate) struct BadTypePlus {
     pub ty: String,
     #[primary_span]
@@ -37,7 +37,7 @@ pub(crate) struct BadTypePlus {
 #[derive(Subdiagnostic)]
 pub(crate) enum BadTypePlusSub {
     #[suggestion(
-        parse_add_paren,
+        message = "try adding parentheses",
         code = "{sum_with_parens}",
         applicability = "machine-applicable"
     )]
@@ -46,12 +46,12 @@ pub(crate) enum BadTypePlusSub {
         #[primary_span]
         span: Span,
     },
-    #[label(parse_forgot_paren)]
+    #[label(message = "perhaps you forgot parentheses?")]
     ForgotParen {
         #[primary_span]
         span: Span,
     },
-    #[label(parse_expect_path)]
+    #[label(message = "expected a path")]
     ExpectPath {
         #[primary_span]
         span: Span,
@@ -1007,7 +1007,7 @@ pub(crate) struct InvalidMetaItemSuggQuoteIdent {
 
 #[derive(Subdiagnostic)]
 #[suggestion(
-    parse_sugg_escape_identifier,
+    message = "escape `{$ident_name}` to use it as an identifier",
     style = "verbose",
     applicability = "maybe-incorrect",
     code = "r#"
@@ -1101,17 +1101,17 @@ impl<'a> IntoDiagnostic<'a> for ExpectedIdentifier {
         diag.arg("token", self.token);
 
         if let Some(sugg) = self.suggest_raw {
-            sugg.add_to_diagnostic(&mut diag);
+            diag.subdiagnostic(dcx, sugg);
         }
 
-        ExpectedIdentifierFound::new(token_descr, self.span).add_to_diagnostic(&mut diag);
+        diag.subdiagnostic(dcx, ExpectedIdentifierFound::new(token_descr, self.span));
 
         if let Some(sugg) = self.suggest_remove_comma {
-            sugg.add_to_diagnostic(&mut diag);
+            diag.subdiagnostic(dcx, sugg);
         }
 
         if let Some(help) = self.help_cannot_start_number {
-            help.add_to_diagnostic(&mut diag);
+            diag.subdiagnostic(dcx, help);
         }
 
         diag
@@ -1162,7 +1162,7 @@ impl<'a> IntoDiagnostic<'a> for ExpectedSemi {
             diag.span_label(unexpected_token_label, fluent::parse_label_unexpected_token);
         }
 
-        self.sugg.add_to_diagnostic(&mut diag);
+        diag.subdiagnostic(dcx, self.sugg);
 
         diag
     }
@@ -1474,8 +1474,8 @@ pub(crate) struct FnTraitMissingParen {
     pub machine_applicable: bool,
 }
 
-impl AddToDiagnostic for FnTraitMissingParen {
-    fn add_to_diagnostic_with<F: SubdiagnosticMessageOp>(self, diag: &mut Diagnostic, _: F) {
+impl<'a> AddToDiagnostic<'a> for FnTraitMissingParen {
+    fn add_to_diagnostic(self, _: &'a DiagCtxt, diag: &mut Diagnostic) {
         diag.span_label(self.span, crate::fluent_generated::parse_fn_trait_missing_paren);
         let applicability = if self.machine_applicable {
             Applicability::MachineApplicable
