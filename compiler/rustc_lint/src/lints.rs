@@ -991,6 +991,17 @@ impl AddToDiagnostic for NonBindingLetSub {
 // levels.rs
 #[derive(LintDiagnostic)]
 #[diag(lint_overruled_attribute)]
+pub struct OverruledAttributeFcw<'a> {
+    #[label]
+    pub overruled: Span,
+    pub lint_level: &'a str,
+    pub lint_source: Symbol,
+    #[subdiagnostic]
+    pub sub: OverruledAttributeSub,
+}
+
+#[derive(LintDiagnostic)]
+#[diag(lint_overruled_attribute, code = E0453)]
 pub struct OverruledAttributeLint<'a> {
     #[label]
     pub overruled: Span,

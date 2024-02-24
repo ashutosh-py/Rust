@@ -6,5 +6,5 @@
 
 #[deny(warnings)]
 //~^ WARNING incompatible with previous forbid
-//~| WARNING being phased out
+//~| WARNING this will change its meaning in a future release!
 fn main() {}

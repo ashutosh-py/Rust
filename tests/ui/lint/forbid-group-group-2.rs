@@ -6,9 +6,9 @@
 
 #[allow(nonstandard_style)]
 //~^ ERROR incompatible with previous
-//~| WARNING previously accepted by the compiler
+//~| WARNING this will change its meaning in a future release!
 //~| ERROR incompatible with previous
-//~| WARNING previously accepted by the compiler
+//~| WARNING this will change its meaning in a future release!
 //~| ERROR incompatible with previous
-//~| WARNING previously accepted by the compiler
+//~| WARNING this will change its meaning in a future release!
 fn main() {}

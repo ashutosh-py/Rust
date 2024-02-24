@@ -166,7 +166,7 @@ declare_lint! {
     Warn,
     "applying forbid to lint-groups",
     @future_incompatible = FutureIncompatibleInfo {
-        reason: FutureIncompatibilityReason::FutureReleaseErrorDontReportInDeps,
+        reason: FutureIncompatibilityReason::FutureReleaseSemanticsChange,
         reference: "issue #81670 <https://github.com/rust-lang/rust/issues/81670>",
     };
 }
@@ -4533,4 +4533,31 @@ declare_lint! {
         reason: FutureIncompatibilityReason::FutureReleaseErrorDontReportInDeps,
         reference: "issue #120192 <https://github.com/rust-lang/rust/issues/120192>",
     };
+}
+
+declare_lint! {
+    /// The `unoverridable_lint_level` lint detects attempts at overriding a `forbid()`
+    /// lint. This does **nothing**, as `forbid()` cannot be overridden.
+    ///
+    /// ### Example
+    ///
+    /// ```rust
+    /// #![forbid(unsafe_code)]
+    ///
+    /// #[deny(unsafe_code)]
+    /// fn main() {}
+    /// ```
+    ///
+    /// {{produces}}
+    ///
+    /// ### Explanation
+    ///
+    /// Then `forbid()` is used on a lint, this lint is guaranteed to be a hard error
+    /// and cannot be overriden. But because macros may use their own `deny()` in their
+    /// expanded output, which might get expanded into a context that is `forbid()` already,
+    /// this is not a hard error.
+    /// As lints in macros are suppressed, so this lint will not show up in these cases.
+    pub UNOVERRIDABLE_LINT_LEVEL,
+    Warn,
+    "attempting to overriding a forbid lint",
 }

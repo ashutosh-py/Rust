@@ -19,14 +19,15 @@
 
 #[allow(unused_variables)]
 //~^ ERROR incompatible with previous
-//~| WARNING this was previously accepted by the compiler
+//~| WARNING this will change its meaning in a future release!
 fn foo() {}
+//~^ ERROR function `foo` is never used
 
 #[allow(unused)] //~ ERROR incompatible with previous
-//~^ WARNING this was previously accepted by the compiler
+//~^ WARNING this will change its meaning in a future release!
 fn bar() {}
 
-#[allow(nonstandard_style)] //~ ERROR incompatible with previous
+#[allow(nonstandard_style)] //~ WARNING incompatible with previous
 fn main() {
     println!("hello forbidden world")
 }
