@@ -1,9 +1,11 @@
 use super::ItemCtxt;
 use crate::astconv::{AstConv, PredicateFilter};
+use rustc_data_structures::fx::FxIndexMap;
 use rustc_hir as hir;
 use rustc_infer::traits::util;
-use rustc_middle::ty::GenericArgs;
-use rustc_middle::ty::{self, Ty, TyCtxt, TypeFoldable, TypeFolder};
+use rustc_middle::ty::fold::shift_vars;
+use rustc_middle::ty::{self, Ty, TyCtxt, TypeFoldable, TypeFolder, TypeVisitableExt};
+use rustc_middle::ty::{GenericArgs, ToPredicate, TypeSuperFoldable};
 use rustc_span::def_id::{DefId, LocalDefId};
 use rustc_span::Span;
 
@@ -34,14 +36,99 @@ fn associated_type_bounds<'tcx>(
     let trait_def_id = tcx.local_parent(assoc_item_def_id);
     let trait_predicates = tcx.trait_explicit_predicates_and_bounds(trait_def_id);
 
-    let bounds_from_parent = trait_predicates.predicates.iter().copied().filter(|(pred, _)| {
-        match pred.kind().skip_binder() {
-            ty::ClauseKind::Trait(tr) => tr.self_ty() == item_ty,
-            ty::ClauseKind::Projection(proj) => proj.projection_ty.self_ty() == item_ty,
-            ty::ClauseKind::TypeOutlives(outlives) => outlives.0 == item_ty,
-            _ => false,
-        }
-    });
+    let item_trait_ref = ty::TraitRef::identity(tcx, tcx.parent(assoc_item_def_id.to_def_id()));
+    let bounds_from_parent =
+        trait_predicates.predicates.iter().copied().filter_map(|(pred, span)| {
+            let mut clause_ty = match pred.kind().skip_binder() {
+                ty::ClauseKind::Trait(tr) => tr.self_ty(),
+                ty::ClauseKind::Projection(proj) => proj.projection_ty.self_ty(),
+                ty::ClauseKind::TypeOutlives(outlives) => outlives.0,
+                _ => return None,
+            };
+
+            // The code below is quite involved, so let me explain.
+            //
+            // We loop here, because we also want to collect vars for nested associated items as
+            // well. For example, given a clause like `Self::A::B`, we want to add that to the
+            // item bounds for `A`, so that we may use that bound in the case that `Self::A::B` is
+            // rigid.
+            //
+            // Secondly, regarding bound vars, when we see a where clause that mentions a GAT
+            // like `for<'a, ...> Self::Assoc<'a, ...>: Bound<'b, ...>`, we want to turn that into
+            // an item bound on the GAT, where all of the GAT args are substituted with the GAT's
+            // param regions, and then keep all of the other late-bound vars in the bound around.
+            // We need to "compress" the binder so that it doesn't mention any of those vars that
+            // were mapped to params.
+            let gat_vars = loop {
+                if let ty::Alias(ty::Projection, alias_ty) = *clause_ty.kind() {
+                    if alias_ty.trait_ref(tcx) == item_trait_ref {
+                        break &alias_ty.args[item_trait_ref.args.len()..];
+                    } else {
+                        clause_ty = alias_ty.self_ty();
+                        continue;
+                    }
+                }
+
+                return None;
+            };
+            // Special-case: No GAT vars, no mapping needed.
+            if gat_vars.is_empty() {
+                return Some((pred, span));
+            }
+
+            // First, check that all of the GAT args are substituted with a unique late-bound arg.
+            // If we find a duplicate, then it can't be mapped to the definition's params.
+            let mut mapping = FxIndexMap::default();
+            let generics = tcx.generics_of(assoc_item_def_id);
+            for (param, var) in std::iter::zip(&generics.params, gat_vars) {
+                let existing = match var.unpack() {
+                    ty::GenericArgKind::Lifetime(re) => {
+                        if let ty::RegionKind::ReBound(ty::INNERMOST, bv) = re.kind() {
+                            mapping.insert(bv.var, tcx.mk_param_from_def(param))
+                        } else {
+                            return None;
+                        }
+                    }
+                    ty::GenericArgKind::Type(ty) => {
+                        if let ty::Bound(ty::INNERMOST, bv) = *ty.kind() {
+                            mapping.insert(bv.var, tcx.mk_param_from_def(param))
+                        } else {
+                            return None;
+                        }
+                    }
+                    ty::GenericArgKind::Const(ct) => {
+                        if let ty::ConstKind::Bound(ty::INNERMOST, bv) = ct.kind() {
+                            mapping.insert(bv, tcx.mk_param_from_def(param))
+                        } else {
+                            return None;
+                        }
+                    }
+                };
+
+                if existing.is_some() {
+                    return None;
+                }
+            }
+
+            // Finally, map all of the args in the GAT to the params we expect, and compress
+            // the remaining late-bound vars so that they count up from var 0.
+            let mut folder = MapAndCompressBoundVars {
+                tcx,
+                binder: ty::INNERMOST,
+                still_bound_vars: vec![],
+                mapping,
+            };
+            let pred = pred.kind().skip_binder().fold_with(&mut folder);
+
+            Some((
+                ty::Binder::bind_with_vars(
+                    pred,
+                    tcx.mk_bound_variable_kinds(&folder.still_bound_vars),
+                )
+                .to_predicate(tcx),
+                span,
+            ))
+        });
 
     let all_bounds = tcx.arena.alloc_from_iter(bounds.clauses().chain(bounds_from_parent));
     debug!(
@@ -50,6 +137,117 @@ fn associated_type_bounds<'tcx>(
         all_bounds
     );
     all_bounds
+}
+
+struct MapAndCompressBoundVars<'tcx> {
+    tcx: TyCtxt<'tcx>,
+    /// How deep are we? Makes sure we don't touch the vars of nested binders.
+    binder: ty::DebruijnIndex,
+    /// List of bound vars that remain unsubstituted because they were not
+    /// mentioned in the GAT's args.
+    still_bound_vars: Vec<ty::BoundVariableKind>,
+    /// Subtle invariant: If the `GenericArg` is bound, then it should be
+    /// stored with the debruijn index of `INNERMOST` so it can be shifted
+    /// correctly during substitution.
+    mapping: FxIndexMap<ty::BoundVar, ty::GenericArg<'tcx>>,
+}
+
+impl<'tcx> TypeFolder<TyCtxt<'tcx>> for MapAndCompressBoundVars<'tcx> {
+    fn interner(&self) -> TyCtxt<'tcx> {
+        self.tcx
+    }
+
+    fn fold_binder<T>(&mut self, t: ty::Binder<'tcx, T>) -> ty::Binder<'tcx, T>
+    where
+        ty::Binder<'tcx, T>: TypeSuperFoldable<TyCtxt<'tcx>>,
+    {
+        self.binder.shift_in(1);
+        let out = t.super_fold_with(self);
+        self.binder.shift_out(1);
+        out
+    }
+
+    fn fold_ty(&mut self, ty: Ty<'tcx>) -> Ty<'tcx> {
+        if !ty.has_bound_vars() {
+            return ty;
+        }
+
+        if let ty::Bound(binder, old_bound) = *ty.kind()
+            && self.binder == binder
+        {
+            let mapped = if let Some(mapped) = self.mapping.get(&old_bound.var) {
+                mapped.expect_ty()
+            } else {
+                // If we didn't find a mapped generic, then make a new one.
+                // Allocate a new var idx, and insert a new bound ty.
+                let var = ty::BoundVar::from_usize(self.still_bound_vars.len());
+                self.still_bound_vars.push(ty::BoundVariableKind::Ty(old_bound.kind));
+                let mapped = Ty::new_bound(
+                    self.tcx,
+                    ty::INNERMOST,
+                    ty::BoundTy { var, kind: old_bound.kind },
+                );
+                self.mapping.insert(old_bound.var, mapped.into());
+                mapped
+            };
+
+            shift_vars(self.tcx, mapped, self.binder.as_u32())
+        } else {
+            ty.super_fold_with(self)
+        }
+    }
+
+    fn fold_region(&mut self, re: ty::Region<'tcx>) -> ty::Region<'tcx> {
+        if let ty::ReBound(binder, old_bound) = re.kind()
+            && self.binder == binder
+        {
+            let mapped = if let Some(mapped) = self.mapping.get(&old_bound.var) {
+                mapped.expect_region()
+            } else {
+                let var = ty::BoundVar::from_usize(self.still_bound_vars.len());
+                self.still_bound_vars.push(ty::BoundVariableKind::Region(old_bound.kind));
+                let mapped = ty::Region::new_bound(
+                    self.tcx,
+                    ty::INNERMOST,
+                    ty::BoundRegion { var, kind: old_bound.kind },
+                );
+                self.mapping.insert(old_bound.var, mapped.into());
+                mapped
+            };
+
+            shift_vars(self.tcx, mapped, self.binder.as_u32())
+        } else {
+            re
+        }
+    }
+
+    fn fold_const(&mut self, ct: ty::Const<'tcx>) -> ty::Const<'tcx> {
+        if !ct.has_bound_vars() {
+            return ct;
+        }
+
+        if let ty::ConstKind::Bound(binder, old_var) = ct.kind()
+            && self.binder == binder
+        {
+            let mapped = if let Some(mapped) = self.mapping.get(&old_var) {
+                mapped.expect_const()
+            } else {
+                let var = ty::BoundVar::from_usize(self.still_bound_vars.len());
+                self.still_bound_vars.push(ty::BoundVariableKind::Const);
+                let mapped = ty::Const::new_bound(self.tcx, ty::INNERMOST, var, ct.ty());
+                self.mapping.insert(old_var, mapped.into());
+                mapped
+            };
+
+            shift_vars(self.tcx, mapped, self.binder.as_u32())
+        } else {
+            ct.super_fold_with(self)
+        }
+    }
+
+    fn fold_predicate(&mut self, p: ty::Predicate<'tcx>) -> ty::Predicate<'tcx> {
+        if !p.has_bound_vars() { p } else { p.super_fold_with(self) }
+    }
 }
 
 /// Opaque types don't inherit bounds from their parent: for return position
