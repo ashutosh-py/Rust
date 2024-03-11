@@ -35,6 +35,15 @@
 // https://github.com/rust-lang/rust/commit/b90cfc887c31c3e7a9e6d462e2464db1fe506175#diff-43914724af6e464c1da2171e4a9b6c7e607d5bc1203fa95c0ab85be4122605ef
 // for an example of how to do so.
 
+/// This redirects `__rust_dealloc` to jemalloc so it can make use of the size of the allocation.
+#[cfg(feature = "jemalloc")]
+#[no_mangle]
+pub unsafe extern "C" fn __rust_dealloc(ptr: *mut u8, size: usize, _align: usize) {
+    unsafe { jemalloc_sys::sdallocx(ptr.cast(), size, 0) }
+    #[used]
+    static _USED: unsafe extern "C" fn(*mut u8, usize, usize) = __rust_dealloc;
+}
+
 fn main() {
     // See the comment at the top of this file for an explanation of this.
     #[cfg(feature = "jemalloc")]
