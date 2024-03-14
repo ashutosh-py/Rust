@@ -7,7 +7,7 @@ LL | #![forbid(unused, non_snake_case)]
 LL | #[allow(unused_variables)]
    |         ^^^^^^^^^^^^^^^^ overruled by previous forbid
    |
-   = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+   = warning: this will change its meaning in a future release!
    = note: for more information, see issue #81670 <https://github.com/rust-lang/rust/issues/81670>
 note: the lint level is defined here
   --> $DIR/outer-forbid.rs:18:11
@@ -16,7 +16,7 @@ LL | #![forbid(forbidden_lint_groups)]
    |           ^^^^^^^^^^^^^^^^^^^^^
 
 error: allow(unused) incompatible with previous forbid
-  --> $DIR/outer-forbid.rs:25:9
+  --> $DIR/outer-forbid.rs:26:9
    |
 LL | #![forbid(unused, non_snake_case)]
    |           ------ `forbid` level set here
@@ -24,18 +24,33 @@ LL | #![forbid(unused, non_snake_case)]
 LL | #[allow(unused)]
    |         ^^^^^^ overruled by previous forbid
    |
-   = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+   = warning: this will change its meaning in a future release!
    = note: for more information, see issue #81670 <https://github.com/rust-lang/rust/issues/81670>
 
-error[E0453]: allow(nonstandard_style) incompatible with previous forbid
-  --> $DIR/outer-forbid.rs:29:9
+warning[E0453]: allow(nonstandard_style) incompatible with previous forbid
+  --> $DIR/outer-forbid.rs:30:9
    |
 LL | #![forbid(unused, non_snake_case)]
    |                   -------------- `forbid` level set here
 ...
 LL | #[allow(nonstandard_style)]
    |         ^^^^^^^^^^^^^^^^^ overruled by previous forbid
+   |
+   = note: `#[warn(unoverridable_lint_level)]` on by default
 
-error: aborting due to 3 previous errors
+error: function `foo` is never used
+  --> $DIR/outer-forbid.rs:23:4
+   |
+LL | fn foo() {}
+   |    ^^^
+   |
+note: the lint level is defined here
+  --> $DIR/outer-forbid.rs:17:11
+   |
+LL | #![forbid(unused, non_snake_case)]
+   |           ^^^^^^
+   = note: `#[forbid(dead_code)]` implied by `#[forbid(unused)]`
+
+error: aborting due to 3 previous errors; 1 warning emitted
 
 For more information about this error, try `rustc --explain E0453`.

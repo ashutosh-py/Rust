@@ -1,6 +1,7 @@
+//@ check-pass
 #![forbid(deprecated)]
 
 #[allow(deprecated)]
-//~^ ERROR allow(deprecated) incompatible
+//~^ WARNING allow(deprecated) incompatible
 fn main() {
 }

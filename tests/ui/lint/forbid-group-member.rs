@@ -7,7 +7,7 @@
 
 #[allow(unused_variables)]
 //~^ WARNING incompatible with previous forbid
-//~| WARNING previously accepted
+//~| WARNING this will change its meaning in a future release!
 fn main() {
     let a: ();
 }

@@ -1,5 +1,6 @@
 //@ compile-flags: -F deprecated
+//@ check-pass
 
-#[allow(deprecated)] //~ ERROR allow(deprecated) incompatible
+#[allow(deprecated)] //~ WARNING allow(deprecated) incompatible
 fn main() {
 }

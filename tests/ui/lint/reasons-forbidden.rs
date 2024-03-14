@@ -23,9 +23,10 @@ fn main() {
     let a_billion_dollar_mistake = ptr::null();
 
     #[allow(unsafe_code)]
-    //~^ ERROR allow(unsafe_code) incompatible with previous forbid
+    //~^ WARNING allow(unsafe_code) incompatible with previous forbid
     //~| NOTE our errors & omissions insurance policy doesn't cover unsafe Rust
     //~| NOTE overruled by previous forbid
+    //~| NOTE on by default
     unsafe {
         //~^ ERROR usage of an `unsafe` block
         //~| NOTE our errors & omissions insurance policy doesn't cover unsafe Rust

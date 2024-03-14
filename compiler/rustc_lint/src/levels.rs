@@ -9,8 +9,9 @@ use crate::{
     fluent_generated as fluent,
     late::unerased_lint_store,
     lints::{
-        DeprecatedLintName, IgnoredUnlessCrateSpecified, OverruledAttributeLint, RemovedLint,
-        RenamedLint, RenamedLintSuggestion, UnknownLint, UnknownLintSuggestion,
+        DeprecatedLintName, IgnoredUnlessCrateSpecified, OverruledAttributeFcw,
+        OverruledAttributeLint, RemovedLint, RenamedLint, RenamedLintSuggestion, UnknownLint,
+        UnknownLintSuggestion,
     },
 };
 use rustc_ast as ast;
@@ -29,6 +30,7 @@ use rustc_middle::lint::{
 };
 use rustc_middle::query::Providers;
 use rustc_middle::ty::{RegisteredTools, TyCtxt};
+use rustc_session::lint::builtin::UNOVERRIDABLE_LINT_LEVEL;
 use rustc_session::lint::{
     builtin::{
         self, FORBIDDEN_LINT_GROUPS, RENAMED_AND_REMOVED_LINTS, SINGLE_USE_LIFETIMES,
@@ -42,8 +44,7 @@ use rustc_span::symbol::{sym, Symbol};
 use rustc_span::{Span, DUMMY_SP};
 
 use crate::errors::{
-    MalformedAttribute, MalformedAttributeSub, OverruledAttribute, OverruledAttributeSub,
-    UnknownToolInScopedLint,
+    MalformedAttribute, MalformedAttributeSub, OverruledAttributeSub, UnknownToolInScopedLint,
 };
 
 /// Collection of lint levels for the whole crate.
@@ -637,11 +638,13 @@ impl<'s, P: LintLevelsProvider> LintLevelsBuilder<'s, P> {
         {
             *id = id.normalize();
         }
-        // Setting to a non-forbid level is an error if the lint previously had
+        // Setting to a non-forbid level is a mistake if the lint previously had
         // a forbid level. Note that this is not necessarily true even with a
         // `#[forbid(..)]` attribute present, as that is overridden by `--cap-lints`.
+        // While this could be a hard error (and was in the past), this causes issues
+        // with macros expanding to deny() in contexts where it's already forbid().
         //
-        // This means that this only errors if we're truly lowering the lint
+        // This means that this only warns if we're truly lowering the lint
         // level from forbid.
         if self.lint_added_lints && level != Level::Forbid {
             if let Level::Forbid = old_level {
@@ -674,18 +677,21 @@ impl<'s, P: LintLevelsProvider> LintLevelsBuilder<'s, P> {
                     LintLevelSource::CommandLine(_, _) => OverruledAttributeSub::CommandLineSource,
                 };
                 if !fcw_warning {
-                    self.sess.dcx().emit_err(OverruledAttribute {
-                        span: src.span(),
-                        overruled: src.span(),
-                        lint_level: level.as_str(),
-                        lint_source: src.name(),
-                        sub,
-                    });
+                    self.emit_span_lint(
+                        UNOVERRIDABLE_LINT_LEVEL,
+                        src.span().into(),
+                        OverruledAttributeLint {
+                            overruled: src.span(),
+                            lint_level: level.as_str(),
+                            lint_source: src.name(),
+                            sub,
+                        },
+                    );
                 } else {
                     self.emit_span_lint(
                         FORBIDDEN_LINT_GROUPS,
                         src.span().into(),
-                        OverruledAttributeLint {
+                        OverruledAttributeFcw {
                             overruled: src.span(),
                             lint_level: level.as_str(),
                             lint_source: src.name(),

@@ -5,16 +5,20 @@
 #[forbid(unused_variables)]
 //~^ NOTE `forbid` level set here
 #[expect(unused_variables)]
-//~^ ERROR incompatible with previous forbid [E0453]
+//~^ WARNING incompatible with previous forbid [E0453]
 //~| NOTE overruled by previous forbid
+//~| NOTE on by default
+//~| WARNING this lint expectation is unfulfilled
+//~| NOTE on by default
 fn expect_forbidden_lint_1() {}
 
 #[forbid(while_true)]
 //~^ NOTE `forbid` level set here
 //~| NOTE the lint level is defined here
 #[expect(while_true)]
-//~^ ERROR incompatible with previous forbid [E0453]
+//~^ WARNING incompatible with previous forbid [E0453]
 //~| NOTE overruled by previous forbid
+//~| WARNING this lint expectation is unfulfilled
 fn expect_forbidden_lint_2() {
     // This while loop will produce a `while_true` lint as the lint level
     // at this node is still `forbid` and the `while_true` check happens
