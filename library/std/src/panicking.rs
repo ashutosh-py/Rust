@@ -260,7 +260,21 @@ fn default_hook(info: &PanicInfo<'_>) {
     let name = thread.as_ref().and_then(|t| t.name()).unwrap_or("<unnamed>");
 
     let write = |err: &mut dyn crate::io::Write| {
-        let _ = writeln!(err, "thread '{name}' panicked at {location}:\n{msg}");
+        // Try to write the panic message to a buffer first to prevent other concurrent outputs
+        // interleaving with it.
+        let mut buffer = [0u8; 512];
+        let mut cursor = crate::io::Cursor::new(&mut buffer[..]);
+
+        let write_msg = |dst: &mut dyn crate::io::Write| {
+            writeln!(dst, "\nthread '{name}' panicked at {location}:\n{msg}")
+        };
+
+        let _ = if write_msg(&mut cursor).is_ok() {
+            let pos = cursor.position() as usize;
+            err.write_all(&buffer[0..pos])
+        } else {
+            write_msg(err)
+        };
 
         static FIRST_PANIC: AtomicBool = AtomicBool::new(true);
 
