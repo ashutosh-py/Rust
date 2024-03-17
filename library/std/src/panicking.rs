@@ -266,14 +266,16 @@ fn default_hook(info: &PanicInfo<'_>) {
         let mut cursor = crate::io::Cursor::new(&mut buffer[..]);
 
         let write_msg = |dst: &mut dyn crate::io::Write| {
+            // We add a newline to ensure the panic message appears at the start of a line.
             writeln!(dst, "\nthread '{name}' panicked at {location}:\n{msg}")
         };
 
-        let _ = if write_msg(&mut cursor).is_ok() {
+        if write_msg(&mut cursor).is_ok() {
             let pos = cursor.position() as usize;
-            err.write_all(&buffer[0..pos])
+            let _ = err.write_all(&buffer[0..pos]);
         } else {
-            write_msg(err)
+            // The message did not fit into the buffer, write it directly instead.
+            let _ = write_msg(err);
         };
 
         static FIRST_PANIC: AtomicBool = AtomicBool::new(true);
