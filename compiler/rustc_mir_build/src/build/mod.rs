@@ -167,6 +167,7 @@ struct Builder<'a, 'tcx> {
     tcx: TyCtxt<'tcx>,
     infcx: InferCtxt<'tcx>,
     region_scope_tree: &'tcx region::ScopeTree,
+    scope_map: &'tcx region::ScopeMapFacade<'tcx>,
     param_env: ty::ParamEnv<'tcx>,
 
     thir: &'a Thir<'tcx>,
@@ -787,6 +788,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
             tcx,
             infcx,
             region_scope_tree: tcx.region_scope_tree(def),
+            scope_map: tcx.body_scope_map(def),
             param_env,
             def_id: def,
             hir_id,
