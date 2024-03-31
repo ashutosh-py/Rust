@@ -231,8 +231,9 @@ pub fn codegen_mir<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>>(
             assert!(!layout.ty.has_erasable_regions());
 
             if layout.size.bytes() >= MIN_DANGEROUS_SIZE {
+                let (size_quantity, size_unit) = human_readable_bytes(layout.size.bytes());
                 cx.tcx().dcx().emit_warn(errors::DangerousStackAllocation {
-                    output: format!("{:.2} {}", human_readable_bytes(layout.size.bytes())),
+                    output: format!("{:.2} {}", size_quantity, size_unit),
                 });
             }
 
