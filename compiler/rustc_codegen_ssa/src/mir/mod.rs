@@ -290,7 +290,7 @@ pub fn codegen_mir<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>>(
 /// Returns a tuple of `(quantity, units)`.
 pub fn human_readable_bytes(bytes: u64) -> (u64, &'static str) {
     static UNITS: [&str; 7] = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"];
-    let i = ((bytes.ilog2() / 10) as usize).min(UNITS.len() - 1);
+    let i = ((bytes.checked_ilog2().unwrap_or(0) / 10) as usize).min(UNITS.len() - 1);
     (bytes >> (10 * i), UNITS[i])
 }
 
