@@ -109,8 +109,56 @@ pub fn try_find_native_static_library(
     .break_value()
 }
 
+fn try_find_native_dynamic_library(sess: &Session, name: &str, verbatim: bool) -> Option<PathBuf> {
+    let formats = if verbatim {
+        vec![("".into(), "".into())]
+    } else {
+        // While the official naming convention for MSVC import libraries
+        // is foo.lib...
+        let os = (sess.target.staticlib_prefix.clone(), sess.target.staticlib_suffix.clone());
+        // ... Meson follows the libfoo.dll.a convention to
+        // disambiguate .a for static libraries
+        let meson = ("lib".into(), ".dll.a".into());
+        // and MinGW uses .a altogether
+        let mingw = ("lib".into(), ".a".into());
+        vec![os, meson, mingw]
+    };
+
+    let path = walk_native_lib_search_dirs(
+        sess,
+        LinkSelfContainedComponents::empty(),
+        None,
+        |dir, is_framework| {
+            if !is_framework {
+                for (prefix, suffix) in &formats {
+                    let test = dir.join(format!("{prefix}{name}{suffix}"));
+                    if test.exists() {
+                        return ControlFlow::Break(test);
+                    }
+                }
+            }
+            ControlFlow::Continue(())
+        },
+    )
+    .break_value();
+
+    match path {
+        Some(_) => path,
+        None => {
+            // Allow the linker to find CRT libs itself
+            let crtlib = PathBuf::from(format!("{}{}", name, if verbatim { "" } else { ".lib" }));
+            Some(crtlib)
+        }
+    }
+}
+
 pub fn find_native_static_library(name: &str, verbatim: bool, sess: &Session) -> PathBuf {
     try_find_native_static_library(sess, name, verbatim)
+        .unwrap_or_else(|| sess.dcx().emit_fatal(errors::MissingNativeLibrary::new(name, verbatim)))
+}
+
+pub fn find_native_dynamic_library(name: &str, verbatim: bool, sess: &Session) -> PathBuf {
+    try_find_native_dynamic_library(sess, name, verbatim)
         .unwrap_or_else(|| sess.dcx().emit_fatal(errors::MissingNativeLibrary::new(name, verbatim)))
 }
 
