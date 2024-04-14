@@ -224,7 +224,7 @@ pub unsafe trait GlobalAlloc {
     ///
     /// The caller has to ensure that
     ///
-    /// * `ptr` is allocated via this allocator,
+    /// * `ptr` is currently allocated via this allocator,
     ///
     /// * `layout` is the same layout that was used
     ///   to allocate that block of memory,
