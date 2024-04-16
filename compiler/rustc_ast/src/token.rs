@@ -589,10 +589,11 @@ impl Token {
 
     /// Returns `true` if the token can appear at the start of an expression.
     pub fn can_begin_expr(&self) -> bool {
+        use Delimiter::*;
         match self.uninterpolate().kind {
             Ident(name, is_raw)              =>
                 ident_can_begin_expr(name, self.span, is_raw), // value name or keyword
-            OpenDelim(..)                     | // tuple, array or block
+            OpenDelim(Parenthesis | Brace | Bracket) | // tuple, array or block
             Literal(..)                       | // literal
             Not                               | // operator not
             BinOp(Minus)                      | // unary minus
@@ -603,13 +604,19 @@ impl Token {
             // DotDotDot is no longer supported, but we need some way to display the error
             DotDot | DotDotDot | DotDotEq     | // range notation
             Lt | BinOp(Shl)                   | // associated path
-            PathSep                            | // global path
+            PathSep                           | // global path
             Lifetime(..)                      | // labeled loop
             Pound                             => true, // expression attributes
             Interpolated(ref nt) => matches!(&**nt, NtLiteral(..) |
                 NtExpr(..)    |
                 NtBlock(..)   |
                 NtPath(..)),
+            OpenDelim(Delimiter::Invisible(InvisibleOrigin::MetaVar(
+                MetaVarKind::Block |
+                MetaVarKind::Expr { .. } |
+                MetaVarKind::Literal |
+                MetaVarKind::Path
+            ))) => true,
             _ => false,
         }
     }
@@ -629,11 +636,17 @@ impl Token {
             // DotDotDot is no longer supported
             | DotDot | DotDotDot | DotDotEq      // ranges
             | Lt | BinOp(Shl)                    // associated path
-            | PathSep                    => true, // global path
+            | PathSep => true,                   // global path
             Interpolated(ref nt) => matches!(&**nt, NtLiteral(..) |
                 NtPat(..)     |
                 NtBlock(..)   |
                 NtPath(..)),
+            OpenDelim(Delimiter::Invisible(InvisibleOrigin::MetaVar(
+                MetaVarKind::Block |
+                MetaVarKind::Pat(_) |
+                MetaVarKind::Path |
+                MetaVarKind::Literal
+            ))) => true,
             _ => false,
         }
     }
@@ -654,6 +667,10 @@ impl Token {
             Lt | BinOp(Shl)             | // associated path
             PathSep                      => true, // global path
             Interpolated(ref nt) => matches!(&**nt, NtTy(..) | NtPath(..)),
+            OpenDelim(Delimiter::Invisible(InvisibleOrigin::MetaVar(
+                MetaVarKind::Ty |
+                MetaVarKind::Path
+            ))) => true,
             // For anonymous structs or unions, which only appear in specific positions
             // (type of struct fields or union fields), we don't consider them as regular types
             _ => false,
@@ -666,6 +683,9 @@ impl Token {
             OpenDelim(Delimiter::Brace) | Literal(..) | BinOp(Minus) => true,
             Ident(name, IdentIsRaw::No) if name.is_bool_lit() => true,
             Interpolated(ref nt) => matches!(&**nt, NtExpr(..) | NtBlock(..) | NtLiteral(..)),
+            OpenDelim(Delimiter::Invisible(InvisibleOrigin::MetaVar(
+                MetaVarKind::Expr { .. } | MetaVarKind::Block | MetaVarKind::Literal,
+            ))) => true,
             _ => false,
         }
     }
@@ -722,6 +742,13 @@ impl Token {
                 },
                 _ => false,
             },
+            OpenDelim(Delimiter::Invisible(InvisibleOrigin::MetaVar(mv_kind))) => match mv_kind {
+                MetaVarKind::Literal => true,
+                MetaVarKind::Expr { can_begin_literal_maybe_minus, .. } => {
+                    can_begin_literal_maybe_minus
+                }
+                _ => false,
+            },
             _ => false,
         }
     }
@@ -735,6 +762,11 @@ impl Token {
                     ast::ExprKind::Lit(_) => true,
                     _ => false,
                 },
+                _ => false,
+            },
+            OpenDelim(Delimiter::Invisible(InvisibleOrigin::MetaVar(mv_kind))) => match mv_kind {
+                MetaVarKind::Literal => true,
+                MetaVarKind::Expr { can_begin_string_literal, .. } => can_begin_string_literal,
                 _ => false,
             },
             _ => false,
