@@ -306,7 +306,7 @@ impl TokenCursor {
                             spacing,
                             delim,
                         ));
-                        if delim != Delimiter::Invisible {
+                        if !delim.skip() {
                             return (Token::new(token::OpenDelim(delim), sp.open), spacing.open);
                         }
                         // No open delimiter to return; continue on to the next iteration.
@@ -315,7 +315,7 @@ impl TokenCursor {
             } else if let Some((tree_cursor, span, spacing, delim)) = self.stack.pop() {
                 // We have exhausted this token stream. Move back to its parent token stream.
                 self.tree_cursor = tree_cursor;
-                if delim != Delimiter::Invisible {
+                if !delim.skip() {
                     return (Token::new(token::CloseDelim(delim), span.close), spacing.close);
                 }
                 // No close delimiter to return; continue on to the next iteration.
@@ -1145,7 +1145,7 @@ impl<'a> Parser<'a> {
         }
         debug_assert!(!matches!(
             next.0.kind,
-            token::OpenDelim(Delimiter::Invisible) | token::CloseDelim(Delimiter::Invisible)
+            token::OpenDelim(delim) | token::CloseDelim(delim) if delim.skip()
         ));
         self.inlined_bump_with(next)
     }
@@ -1177,7 +1177,7 @@ impl<'a> Parser<'a> {
                     // The tree cursor lookahead went (one) past the end of the
                     // current token tree. Try to return a close delimiter.
                     if let Some(&(_, span, _, delim)) = self.token_cursor.stack.last()
-                        && delim != Delimiter::Invisible
+                        && !delim.skip()
                     {
                         // We are not in the outermost token stream, so we have
                         // delimiters. Also, those delimiters are not skipped.
@@ -1196,7 +1196,7 @@ impl<'a> Parser<'a> {
             token = cursor.next().0;
             if matches!(
                 token.kind,
-                token::OpenDelim(Delimiter::Invisible) | token::CloseDelim(Delimiter::Invisible)
+                token::OpenDelim(delim) | token::CloseDelim(delim) if delim.skip()
             ) {
                 continue;
             }
