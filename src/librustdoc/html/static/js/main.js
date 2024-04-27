@@ -353,6 +353,27 @@ function preLoadCss(cssUrl) {
         loadedDescShard: function(crate, shard, data) {
             this.descShards.get(crate)[shard].resolve(data.split("\n"));
         },
+        paramNameShards: new Map(),
+        paramNameResolvers: new Map(),
+        loadParamNames: async function(crate) {
+            if (this.paramNameShards.has(crate)) {
+                return this.paramNameShards.get(crate);
+            } else {
+                const promise = new Promise((resolve, reject) => {
+                    this.paramNameResolvers.set(crate, resolve);
+                    const url = resourcePath(
+                        `search.desc/${crate}/${crate}-param-names`,
+                        ".js",
+                    );
+                    loadScript(url, reject);
+                });
+                this.paramNameShards.set(crate, promise);
+                return promise;
+            }
+        },
+        loadedParamNames: function(crate, data) {
+            this.paramNameResolvers.get(crate)(JSON.parse(data));
+        },
     };
 
     const toggleAllDocsId = "toggle-all-docs";
@@ -1103,6 +1124,9 @@ function preLoadCss(cssUrl) {
                 titleContent.appendChild(document.createTextNode(e.getAttribute("data-title")));
                 wrapper.appendChild(titleContent);
             }
+            if (e.RUSTDOC_TOOLTIP_DOM) {
+                wrapper.appendChild(e.RUSTDOC_TOOLTIP_DOM);
+            }
         }
         wrapper.className = "tooltip popover";
         const focusCatcher = document.createElement("div");
@@ -1242,7 +1266,7 @@ function preLoadCss(cssUrl) {
         }
     }
 
-    onEachLazy(document.getElementsByClassName("tooltip"), e => {
+    window.rustdocConfigureTooltip = e => {
         e.onclick = () => {
             e.TOOLTIP_FORCE_VISIBLE = e.TOOLTIP_FORCE_VISIBLE ? false : true;
             if (window.CURRENT_TOOLTIP_ELEMENT && !e.TOOLTIP_FORCE_VISIBLE) {
@@ -1310,7 +1334,8 @@ function preLoadCss(cssUrl) {
                 addClass(window.CURRENT_TOOLTIP_ELEMENT, "fade-out");
             }
         };
-    });
+    };
+    onEachLazy(document.getElementsByClassName("tooltip"), window.rustdocConfigureTooltip);
 
     const sidebar_menu_toggle = document.getElementsByClassName("sidebar-menu-toggle")[0];
     if (sidebar_menu_toggle) {
