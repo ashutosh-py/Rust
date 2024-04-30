@@ -1502,6 +1502,10 @@ impl<'a> Builder<'a> {
             rustflags.arg("--cfg=bootstrap");
         }
 
+        if stage != 0 && mode == Mode::Std {
+            rustflags.arg("-Zmir-only-rlibs");
+        }
+
         if cmd == "clippy" {
             // clippy overwrites sysroot if we pass it to cargo.
             // Pass it directly to clippy instead.
