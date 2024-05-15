@@ -283,12 +283,12 @@ impl TokenCursor {
             // below can be removed.
             if let Some(tree) = self.tree_cursor.next_ref() {
                 match tree {
-                    &TokenTree::Token(ref token, spacing) => {
+                    &TokenTree::Token(token, spacing) => {
                         debug_assert!(!matches!(
                             token.kind,
                             token::OpenDelim(_) | token::CloseDelim(_)
                         ));
-                        return (token.clone(), spacing);
+                        return (token, spacing);
                     }
                     &TokenTree::Delimited(sp, spacing, delim, ref tts) => {
                         let trees = tts.clone().into_trees();
@@ -573,7 +573,7 @@ impl<'a> Parser<'a> {
     fn check(&mut self, tok: &TokenKind) -> bool {
         let is_present = self.token == *tok;
         if !is_present {
-            self.expected_tokens.push(TokenType::Token(tok.clone()));
+            self.expected_tokens.push(TokenType::Token(*tok));
         }
         is_present
     }
@@ -1470,7 +1470,7 @@ impl<'a> Parser<'a> {
             _ => {
                 let prev_spacing = self.token_spacing;
                 self.bump();
-                TokenTree::Token(self.prev_token.clone(), prev_spacing)
+                TokenTree::Token(self.prev_token, prev_spacing)
             }
         }
     }
@@ -1652,7 +1652,7 @@ impl<'a> Parser<'a> {
                 dbg_fmt.field("prev_token", &parser.prev_token);
                 let mut tokens = vec![];
                 for i in 0..*lookahead {
-                    let tok = parser.look_ahead(i, |tok| tok.kind.clone());
+                    let tok = parser.look_ahead(i, |tok| tok.kind);
                     let is_eof = tok == TokenKind::Eof;
                     tokens.push(tok);
                     if is_eof {
