@@ -1267,7 +1267,9 @@ function preLoadCss(cssUrl) {
     }
 
     window.rustdocConfigureTooltip = e => {
-        e.onclick = () => {
+        e.addEventListener("click", ev => {
+            ev.preventDefault();
+            ev.stopPropagation();
             e.TOOLTIP_FORCE_VISIBLE = e.TOOLTIP_FORCE_VISIBLE ? false : true;
             if (window.CURRENT_TOOLTIP_ELEMENT && !e.TOOLTIP_FORCE_VISIBLE) {
                 hideTooltip(true);
@@ -1278,10 +1280,14 @@ function preLoadCss(cssUrl) {
                 window.CURRENT_TOOLTIP_ELEMENT.onblur = tooltipBlurHandler;
             }
             return false;
-        };
+        });
         e.onpointerenter = ev => {
             // If this is a synthetic touch event, ignore it. A click event will be along shortly.
             if (ev.pointerType !== "mouse") {
+                return;
+            }
+            if (window.CURRENT_TOOLTIP_ELEMENT &&
+                window.CURRENT_TOOLTIP_ELEMENT.TOOLTIP_BASE.TOOLTIP_FORCE_VISIBLE) {
                 return;
             }
             setTooltipHoverTimeout(e, true);
@@ -1298,8 +1304,11 @@ function preLoadCss(cssUrl) {
             if (ev.pointerType !== "mouse") {
                 return;
             }
-            if (!e.TOOLTIP_FORCE_VISIBLE && window.CURRENT_TOOLTIP_ELEMENT &&
-                !window.CURRENT_TOOLTIP_ELEMENT.contains(ev.relatedTarget)) {
+            if (window.CURRENT_TOOLTIP_ELEMENT &&
+                window.CURRENT_TOOLTIP_ELEMENT.TOOLTIP_BASE !== e) {
+                return;
+            }
+            if (!e.TOOLTIP_FORCE_VISIBLE) {
                 // Tooltip pointer leave gesture:
                 //
                 // Designing a good hover microinteraction is a matter of guessing user
@@ -1331,7 +1340,10 @@ function preLoadCss(cssUrl) {
                 // * https://www.nngroup.com/articles/tooltip-guidelines/
                 // * https://bjk5.com/post/44698559168/breaking-down-amazons-mega-dropdown
                 setTooltipHoverTimeout(e, false);
-                addClass(window.CURRENT_TOOLTIP_ELEMENT, "fade-out");
+                if (window.CURRENT_TOOLTIP_ELEMENT &&
+                    !window.CURRENT_TOOLTIP_ELEMENT.contains(ev.relatedTarget)) {
+                    addClass(window.CURRENT_TOOLTIP_ELEMENT, "fade-out");
+                }
             }
         };
     };
