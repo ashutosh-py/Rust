@@ -146,6 +146,7 @@ impl<'a> Parser<'a> {
                     item.is_valid_for_outer_style(),
                 );
             }
+
             Ok(attr::mk_attr_from_item(&self.psess.attr_id_generator, item, None, style, attr_sp))
         })
     }
