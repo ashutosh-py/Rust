@@ -737,6 +737,10 @@ impl Build {
         }
     }
 
+    fn gcc_out(&self, target: TargetSelection) -> PathBuf {
+        self.out.join(&*target.triple).join("gcc")
+    }
+
     fn lld_out(&self, target: TargetSelection) -> PathBuf {
         self.out.join(target).join("lld")
     }
