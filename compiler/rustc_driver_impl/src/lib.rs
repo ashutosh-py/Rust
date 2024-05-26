@@ -734,6 +734,7 @@ fn print_crate_info(
                 targets.sort_unstable();
                 println_info!("{}", targets.join("\n"));
             }
+            HostTriple => println_info!("{}", rustc_session::config::host_triple()),
             Sysroot => println_info!("{}", sess.sysroot.display()),
             TargetLibdir => println_info!("{}", sess.target_tlib_path.dir.display()),
             TargetSpec => {

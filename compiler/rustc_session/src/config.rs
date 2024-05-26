@@ -769,6 +769,7 @@ pub struct PrintRequest {
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum PrintKind {
     FileNames,
+    HostTriple,
     Sysroot,
     TargetLibdir,
     CrateName,
@@ -1863,6 +1864,7 @@ fn collect_print_requests(
         ("crate-name", PrintKind::CrateName),
         ("deployment-target", PrintKind::DeploymentTarget),
         ("file-names", PrintKind::FileNames),
+        ("host-triple", PrintKind::HostTriple),
         ("link-args", PrintKind::LinkArgs),
         ("native-static-libs", PrintKind::NativeStaticLibs),
         ("relocation-models", PrintKind::RelocationModels),
