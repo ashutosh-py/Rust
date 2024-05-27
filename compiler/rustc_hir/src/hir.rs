@@ -571,6 +571,10 @@ impl<'hir> Generics<'hir> {
         self.params.iter().find(|&param| name == param.name.ident().name)
     }
 
+    pub fn get_with_local_def_id(&self, id: LocalDefId) -> Option<&GenericParam<'hir>> {
+        self.params.iter().find(|&param| id == param.def_id)
+    }
+
     /// If there are generic parameters, return where to introduce a new one.
     pub fn span_for_lifetime_suggestion(&self) -> Option<Span> {
         if let Some(first) = self.params.first()
