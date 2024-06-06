@@ -1572,7 +1572,9 @@ function initSearch(rawSearchIndex) {
                     for (const nested of fnType.generics) {
                         writeFn(nested, where);
                     }
-                    whereClause.set(fnParamNames[-1 - fnType.id], where);
+                    if (where.length > 0) {
+                        whereClause.set(fnParamNames[-1 - fnType.id], where);
+                    }
                 } else {
                     if (fnType.ty === TY_PRIMITIVE) {
                         if (fnType.id === typeNameIdOfArray || fnType.id === typeNameIdOfSlice ||
