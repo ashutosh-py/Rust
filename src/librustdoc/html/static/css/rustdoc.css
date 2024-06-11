@@ -1564,7 +1564,8 @@ instead, we check that it's not a "finger" cursor.
 	position: relative;
 }
 
-.code-header a.tooltip:hover {
+.code-header a.tooltip:hover,
+.search-results a.tooltip:hover {
 	color: var(--link-color);
 }
 
