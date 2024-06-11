@@ -354,7 +354,7 @@ details:not(.toggle) summary {
 	margin-bottom: .6em;
 }
 
-code, pre, .code-header {
+code, pre, .code-header, .type-signature  {
 	font-family: "Source Code Pro", monospace;
 }
 .docblock code, .docblock-short code {
