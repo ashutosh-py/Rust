@@ -1269,7 +1269,7 @@ function preLoadCss(cssUrl) {
     }
 
     window.rustdocConfigureTooltip = e => {
-        e.addEventListener("click", ev => {
+        e.onclick = ev => {
             ev.preventDefault();
             ev.stopPropagation();
             e.TOOLTIP_FORCE_VISIBLE = e.TOOLTIP_FORCE_VISIBLE ? false : true;
@@ -1282,7 +1282,7 @@ function preLoadCss(cssUrl) {
                 window.CURRENT_TOOLTIP_ELEMENT.onblur = tooltipBlurHandler;
             }
             return false;
-        });
+        };
         e.onpointerenter = ev => {
             // If this is a synthetic touch event, ignore it. A click event will be along shortly.
             if (ev.pointerType !== "mouse") {
