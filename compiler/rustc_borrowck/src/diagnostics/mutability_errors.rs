@@ -19,6 +19,7 @@ use rustc_target::abi::FieldIdx;
 use rustc_trait_selection::infer::InferCtxtExt;
 use rustc_trait_selection::traits;
 use rustc_trait_selection::traits::error_reporting::suggestions::TypeErrCtxtExt;
+use std::borrow::Cow;
 
 use crate::diagnostics::BorrowedContentSource;
 use crate::util::FindAssignments;
@@ -49,6 +50,7 @@ impl<'tcx> MirBorrowckCtxt<'_, '_, '_, 'tcx> {
         let mut err;
         let item_msg;
         let reason;
+        let reason_owned;
         let mut opt_source = None;
         let access_place_desc = self.describe_any_place(access_place.as_ref());
         debug!("report_mutability_error: access_place_desc={:?}", access_place_desc);
@@ -57,10 +59,11 @@ impl<'tcx> MirBorrowckCtxt<'_, '_, '_, 'tcx> {
             PlaceRef { local, projection: [] } => {
                 item_msg = access_place_desc;
                 if access_place.as_local().is_some() {
-                    reason = ", as it is not declared as mutable".to_string();
+                    reason = ", as it is not declared as mutable";
                 } else {
                     let name = self.local_names[local].expect("immutable unnamed local");
-                    reason = format!(", as `{name}` is not declared as mutable");
+                    reason_owned = format!(", as `{name}` is not declared as mutable");
+                    reason = &reason_owned;
                 }
             }
 
@@ -88,11 +91,12 @@ impl<'tcx> MirBorrowckCtxt<'_, '_, '_, 'tcx> {
                     return;
                 } else {
                     item_msg = access_place_desc;
-                    if self.is_upvar_field_projection(access_place.as_ref()).is_some() {
-                        reason = ", as it is not declared as mutable".to_string();
+                    reason = if self.is_upvar_field_projection(access_place.as_ref()).is_some() {
+                        ", as it is not declared as mutable"
                     } else {
                         let name = self.upvars[upvar_index.index()].to_string(self.infcx.tcx);
-                        reason = format!(", as `{name}` is not declared as mutable");
+                        reason_owned = format!(", as `{name}` is not declared as mutable");
+                        &reason_owned
                     }
                 }
             }
@@ -101,20 +105,21 @@ impl<'tcx> MirBorrowckCtxt<'_, '_, '_, 'tcx> {
                 if self.body.local_decls[local].is_ref_for_guard() =>
             {
                 item_msg = access_place_desc;
-                reason = ", as it is immutable for the pattern guard".to_string();
+                reason = ", as it is immutable for the pattern guard";
             }
             PlaceRef { local, projection: [ProjectionElem::Deref] }
                 if self.body.local_decls[local].is_ref_to_static() =>
             {
                 if access_place.projection.len() == 1 {
                     item_msg = format!("immutable static item {access_place_desc}");
-                    reason = String::new();
+                    reason = "";
                 } else {
                     item_msg = access_place_desc;
                     let local_info = self.body.local_decls[local].local_info();
                     if let LocalInfo::StaticRef { def_id, .. } = *local_info {
                         let static_name = &self.infcx.tcx.item_name(def_id);
-                        reason = format!(", as `{static_name}` is an immutable static item");
+                        reason_owned = format!(", as `{static_name}` is an immutable static item");
+                        reason = &reason_owned;
                     } else {
                         bug!("is_ref_to_static return true, but not ref to static?");
                     }
@@ -130,9 +135,9 @@ impl<'tcx> MirBorrowckCtxt<'_, '_, '_, 'tcx> {
                     debug_assert!(is_closure_like(the_place_err.ty(self.body, self.infcx.tcx).ty));
 
                     reason = if self.is_upvar_field_projection(access_place.as_ref()).is_some() {
-                        ", as it is a captured variable in a `Fn` closure".to_string()
+                        ", as it is a captured variable in a `Fn` closure"
                     } else {
-                        ", as `Fn` closures cannot mutate their captured variables".to_string()
+                        ", as `Fn` closures cannot mutate their captured variables"
                     }
                 } else {
                     let source = self.borrowed_content_source(PlaceRef {
@@ -143,15 +148,16 @@ impl<'tcx> MirBorrowckCtxt<'_, '_, '_, 'tcx> {
                     opt_source = Some(source);
                     if let Some(desc) = self.describe_place(access_place.as_ref()) {
                         item_msg = format!("`{desc}`");
-                        reason = match error_access {
+                        reason_owned = match error_access {
                             AccessKind::Mutate => format!(", which is behind {pointer_type}"),
                             AccessKind::MutableBorrow => {
                                 format!(", as it is behind {pointer_type}")
                             }
-                        }
+                        };
+                        reason = &reason_owned;
                     } else {
                         item_msg = format!("data in {pointer_type}");
-                        reason = String::new();
+                        reason = "";
                     }
                 }
             }
@@ -183,7 +189,7 @@ impl<'tcx> MirBorrowckCtxt<'_, '_, '_, 'tcx> {
 
         let span = match error_access {
             AccessKind::Mutate => {
-                err = self.cannot_assign(span, &(item_msg + &reason));
+                err = self.cannot_assign(span, &(item_msg + reason));
                 act = "assign";
                 acted_on = "written";
                 span
@@ -1103,9 +1109,9 @@ impl<'tcx> MirBorrowckCtxt<'_, '_, '_, 'tcx> {
         let label = match *local_decl.local_info() {
             LocalInfo::User(mir::BindingForm::ImplicitSelf(_)) => {
                 let suggestion = suggest_ampmut_self(self.infcx.tcx, decl_span);
-                let additional =
-                    local_trait.map(|span| (span, suggest_ampmut_self(self.infcx.tcx, span)));
-                Some((true, decl_span, suggestion, additional))
+                let additional = local_trait
+                    .map(|span| (span, suggest_ampmut_self(self.infcx.tcx, span).into_owned()));
+                Some((true, decl_span, suggestion.into_owned(), additional))
             }
 
             LocalInfo::User(mir::BindingForm::Var(mir::VarBindingForm {
@@ -1171,7 +1177,7 @@ impl<'tcx> MirBorrowckCtxt<'_, '_, '_, 'tcx> {
                                 ),
                             }
                         };
-                        Some((has_sugg, decl_span, sugg, None))
+                        Some((has_sugg, decl_span, sugg.into_owned(), None))
                     }
                 }
             }
@@ -1182,7 +1188,7 @@ impl<'tcx> MirBorrowckCtxt<'_, '_, '_, 'tcx> {
             })) => {
                 let pattern_span: Span = local_decl.source_info.span;
                 suggest_ref_mut(self.infcx.tcx, pattern_span)
-                    .map(|span| (true, span, "mut ".to_owned(), None))
+                    .map(|span| (true, span, "mut ".into(), None))
             }
 
             _ => unreachable!(),
@@ -1399,17 +1405,17 @@ pub fn mut_borrow_of_mutable_ref(local_decl: &LocalDecl<'_>, local_name: Option<
     }
 }
 
-fn suggest_ampmut_self<'tcx>(tcx: TyCtxt<'tcx>, span: Span) -> String {
+fn suggest_ampmut_self<'tcx>(tcx: TyCtxt<'tcx>, span: Span) -> Cow<'static, str> {
     match tcx.sess.source_map().span_to_snippet(span) {
         Ok(snippet) => {
             let lt_pos = snippet.find('\'');
             if let Some(lt_pos) = lt_pos {
-                format!("&{}mut self", &snippet[lt_pos..snippet.len() - 4])
+                format!("&{}mut self", &snippet[lt_pos..snippet.len() - 4]).into()
             } else {
-                "&mut self".to_string()
+                "&mut self".into()
             }
         }
-        _ => "&mut self".to_string(),
+        _ => "&mut self".into(),
     }
 }
 
@@ -1434,7 +1440,7 @@ fn suggest_ampmut<'tcx>(
     decl_span: Span,
     opt_assignment_rhs_span: Option<Span>,
     opt_ty_info: Option<Span>,
-) -> (bool, Span, String) {
+) -> (bool, Span, Cow<'static, str>) {
     // if there is a RHS and it starts with a `&` from it, then check if it is
     // mutable, and if not, put suggest putting `mut ` to make it mutable.
     // we don't have to worry about lifetime annotations here because they are
@@ -1470,7 +1476,7 @@ fn suggest_ampmut<'tcx>(
 
             // FIXME(Ezrashaw): returning is bad because we still might want to
             // update the annotated type, see #106857.
-            return (true, span, "mut ".to_owned());
+            return (true, span, "mut ".into());
         }
     }
 
@@ -1495,18 +1501,18 @@ fn suggest_ampmut<'tcx>(
         && let Some(ws_pos) = src.find(char::is_whitespace)
     {
         let span = span.with_lo(span.lo() + BytePos(ws_pos as u32)).shrink_to_lo();
-        (true, span, " mut".to_owned())
+        (true, span, " mut".into())
     // if there is already a binding, we modify it to be `mut`
     } else if binding_exists {
         // shrink the span to just after the `&` in `&variable`
         let span = span.with_lo(span.lo() + BytePos(1)).shrink_to_lo();
-        (true, span, "mut ".to_owned())
+        (true, span, "mut ".into())
     } else {
         // otherwise, suggest that the user annotates the binding; we provide the
         // type of the local.
         let ty = decl_ty.builtin_deref(true).unwrap();
 
-        (false, span, format!("{}mut {}", if decl_ty.is_ref() { "&" } else { "*" }, ty))
+        (false, span, format!("{}mut {}", if decl_ty.is_ref() { "&" } else { "*" }, ty).into())
     }
 }
 

@@ -1,5 +1,7 @@
 //! Borrow checker diagnostics.
 
+use std::borrow::Cow;
+
 use crate::session_diagnostics::{
     CaptureArgLabel, CaptureReasonLabel, CaptureReasonNote, CaptureReasonSuggest, CaptureVarCause,
     CaptureVarKind, CaptureVarPathUseCause, OnClosureNote,
@@ -585,7 +587,11 @@ impl UseSpans<'_> {
 
     /// Add a span label to the arguments of the closure, if it exists.
     #[allow(rustc::diagnostic_outside_of_impl)]
-    pub(super) fn args_subdiag(self, err: &mut Diag<'_>, f: impl FnOnce(Span) -> CaptureArgLabel) {
+    pub(super) fn args_subdiag<'a>(
+        self,
+        err: &mut Diag<'_>,
+        f: impl FnOnce(Span) -> CaptureArgLabel<'a>,
+    ) {
         if let UseSpans::ClosureUse { args_span, .. } = self {
             err.subdiagnostic(f(args_span));
         }
@@ -1014,8 +1020,8 @@ impl<'tcx> MirBorrowckCtxt<'_, '_, '_, 'tcx> {
         if let UseSpans::FnSelfUse { var_span, fn_call_span, fn_span, kind } = move_spans {
             let place_name = self
                 .describe_place(moved_place.as_ref())
-                .map(|n| format!("`{n}`"))
-                .unwrap_or_else(|| "value".to_owned());
+                .map(|n| Cow::Owned(format!("`{n}`")))
+                .unwrap_or("value".into());
             match kind {
                 CallKind::FnCall { fn_trait_id, self_ty }
                     if self.infcx.tcx.is_lang_item(fn_trait_id, LangItem::FnOnce) =>
@@ -1134,7 +1140,7 @@ impl<'tcx> MirBorrowckCtxt<'_, '_, '_, 'tcx> {
                         let func = tcx.def_path_str(method_did);
                         err.subdiagnostic(CaptureReasonNote::FuncTakeSelf {
                             func,
-                            place_name: place_name.clone(),
+                            place_name: &place_name,
                             span: self_arg.span,
                         });
                     }
