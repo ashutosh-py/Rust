@@ -11,7 +11,7 @@
 use crate::constrained_generic_params as cgp;
 use min_specialization::check_min_specialization;
 
-use rustc_data_structures::fx::FxHashSet;
+use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_errors::{codes::*, struct_span_code_err};
 use rustc_hir::def::DefKind;
 use rustc_hir::def_id::LocalDefId;
@@ -88,13 +88,35 @@ fn enforce_impl_params_are_constrained(
 
     impl_trait_ref.error_reported()?;
 
-    let mut input_parameters = cgp::parameters_for_impl(tcx, impl_self_ty, impl_trait_ref);
+    let mut constrained_parameters = cgp::parameters_for_impl(tcx, impl_self_ty, impl_trait_ref);
     cgp::identify_constrained_generic_params(
         tcx,
         impl_predicates,
         impl_trait_ref,
-        &mut input_parameters,
+        &mut constrained_parameters,
     );
+
+    // Reasons each generic is unconstrained, or Other if not present
+    let mut unconstrained_reasons = FxHashMap::default();
+    for (clause, _) in impl_predicates.predicates {
+        if let Some(projection) = clause.as_projection_clause() {
+            let mentioned_params = cgp::parameters_for(tcx, projection.term().skip_binder(), true);
+            let is_clause_circular =
+                Some(projection.required_poly_trait_ref(tcx).skip_binder()) == impl_trait_ref;
+
+            for param in mentioned_params {
+                if is_clause_circular {
+                    // Potentially override BoundToUnconstrainedProjection
+                    unconstrained_reasons.insert(param, UnconstrainedReason::BoundCircularly);
+                } else {
+                    // Don't override BoundCircularly
+                    unconstrained_reasons
+                        .entry(param)
+                        .or_insert(UnconstrainedReason::BoundToUnconstrainedProjection);
+                }
+            }
+        }
+    }
 
     // Disallow unconstrained lifetimes, but only if they appear in assoc types.
     let lifetimes_in_associated_types: FxHashSet<_> = tcx
@@ -115,42 +137,56 @@ fn enforce_impl_params_are_constrained(
         })
         .collect();
 
+    let impl_kind = match impl_trait_ref {
+        Some(_) => ImplKind::ImplTrait,
+        None => ImplKind::InherentImpl,
+    };
+
     let mut res = Ok(());
     for param in &impl_generics.own_params {
+        let cgp_param = cgp::Parameter(param.index);
+        let unconstrained_reason =
+            unconstrained_reasons.get(&cgp_param).copied().unwrap_or_default();
+
         match param.kind {
             // Disallow ANY unconstrained type parameters.
             ty::GenericParamDefKind::Type { .. } => {
                 let param_ty = ty::ParamTy::for_def(param);
-                if !input_parameters.contains(&cgp::Parameter::from(param_ty)) {
+                if !constrained_parameters.contains(&cgp_param) {
                     res = Err(report_unused_parameter(
                         tcx,
                         tcx.def_span(param.def_id),
                         "type",
                         param_ty.name,
+                        impl_kind,
+                        unconstrained_reason,
                     ));
                 }
             }
             ty::GenericParamDefKind::Lifetime => {
-                let param_lt = cgp::Parameter::from(param.to_early_bound_region_data());
-                if lifetimes_in_associated_types.contains(&param_lt) && // (*)
-                    !input_parameters.contains(&param_lt)
+                if lifetimes_in_associated_types.contains(&cgp_param) && // (*)
+                    !constrained_parameters.contains(&cgp_param)
                 {
                     res = Err(report_unused_parameter(
                         tcx,
                         tcx.def_span(param.def_id),
                         "lifetime",
                         param.name,
+                        impl_kind,
+                        unconstrained_reason,
                     ));
                 }
             }
             ty::GenericParamDefKind::Const { .. } => {
                 let param_ct = ty::ParamConst::for_def(param);
-                if !input_parameters.contains(&cgp::Parameter::from(param_ct)) {
+                if !constrained_parameters.contains(&cgp_param) {
                     res = Err(report_unused_parameter(
                         tcx,
                         tcx.def_span(param.def_id),
                         "const",
                         param_ct.name,
+                        impl_kind,
+                        unconstrained_reason,
                     ));
                 }
             }
@@ -178,11 +214,30 @@ fn enforce_impl_params_are_constrained(
     // used elsewhere are not projected back out.
 }
 
+#[derive(Copy, Clone)]
+enum ImplKind {
+    ImplTrait,
+    InherentImpl,
+}
+
+#[derive(Copy, Clone, Default)]
+enum UnconstrainedReason {
+    /// Not used in the impl trait, self type, nor bound to any projection
+    #[default]
+    Other,
+    /// Bound to a projection, but the LHS was not constrained
+    BoundToUnconstrainedProjection,
+    /// Bound to a projection, but the LHS is the trait being implemented
+    BoundCircularly,
+}
+
 fn report_unused_parameter(
     tcx: TyCtxt<'_>,
     span: Span,
     kind: &str,
     name: Symbol,
+    impl_kind: ImplKind,
+    unconstrained_reason: UnconstrainedReason,
 ) -> ErrorGuaranteed {
     let mut err = struct_span_code_err!(
         tcx.dcx(),
@@ -194,6 +249,38 @@ fn report_unused_parameter(
         name
     );
     err.span_label(span, format!("unconstrained {kind} parameter"));
+
+    match impl_kind {
+        ImplKind::ImplTrait => {
+            err.note(format!(
+                "to constrain `{name}`, use it in the implemented trait, in the self type, \
+                or in an equality with an associated type"
+            ));
+        }
+        ImplKind::InherentImpl => {
+            err.note(format!(
+                "to constrain `{name}`, use it in the self type, \
+                or in an equality with an associated type"
+            ));
+        }
+    }
+
+    match unconstrained_reason {
+        UnconstrainedReason::BoundToUnconstrainedProjection => {
+            err.note(format!(
+                "`{name}` is bound to an associated type, \
+                but the reference to the associated type itself uses unconstrained generic parameters"
+            ));
+        }
+        UnconstrainedReason::BoundCircularly => {
+            err.note(format!(
+                "`{name}` is bound to an associated type, \
+                but the associated type is circularly defined in this impl"
+            ));
+        }
+        UnconstrainedReason::Other => {}
+    }
+
     if kind == "const" {
         err.note(
             "expressions using a const parameter must map each value to a distinct output value",
@@ -202,5 +289,6 @@ fn report_unused_parameter(
             "proving the result of expressions other than the parameter are unique is not supported",
         );
     }
+
     err.emit()
 }
