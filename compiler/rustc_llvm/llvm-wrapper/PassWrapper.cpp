@@ -408,8 +408,8 @@ extern "C" LLVMTargetMachineRef LLVMRustCreateTargetMachine(
     LLVMRustCodeGenOptLevel RustOptLevel, bool UseSoftFloat,
     bool FunctionSections, bool DataSections, bool UniqueSectionNames,
     bool TrapUnreachable, bool Singlethread, bool AsmComments,
-    bool EmitStackSizeSection, bool RelaxELFRelocations, bool UseInitArray, bool UseHotpatch,
-    const char *SplitDwarfFile, const char *OutputObjFile,
+    bool EmitStackSizeSection, bool RelaxELFRelocations, bool UseInitArray,
+    bool UseHotpatch, const char *SplitDwarfFile, const char *OutputObjFile,
     const char *DebugInfoCompression, bool UseEmulatedTls,
     const char *ArgsCstrBuff, size_t ArgsCstrBuffLen) {
 
