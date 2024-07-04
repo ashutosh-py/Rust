@@ -41,7 +41,7 @@ use super::{
 use crate::{errors, maybe_recover_from_interpolated_ty_qpath};
 
 #[derive(Debug)]
-enum DestructuredFloat {
+pub(super) enum DestructuredFloat {
     /// 1e2
     Single(Symbol, Span),
     /// 1.
@@ -1012,15 +1012,17 @@ impl<'a> Parser<'a> {
         self.dcx().emit_err(errors::UnexpectedTokenAfterDot { span, actual })
     }
 
-    // We need an identifier or integer, but the next token is a float.
-    // Break the float into components to extract the identifier or integer.
+    /// We need an identifier or integer, but the next token is a float.
+    /// Break the float into components to extract the identifier or integer.
+    ///
+    /// See also [`TokenKind::break_two_token_op`] which does similar splitting of `>>` into `>`.
+    //
     // FIXME: With current `TokenCursor` it's hard to break tokens into more than 2
     // parts unless those parts are processed immediately. `TokenCursor` should either
     // support pushing "future tokens" (would be also helpful to `break_and_eat`), or
     // we should break everything including floats into more basic proc-macro style
     // tokens in the lexer (probably preferable).
-    // See also `TokenKind::break_two_token_op` which does similar splitting of `>>` into `>`.
-    fn break_up_float(&self, float: Symbol, span: Span) -> DestructuredFloat {
+    pub(super) fn break_up_float(&self, float: Symbol, span: Span) -> DestructuredFloat {
         #[derive(Debug)]
         enum FloatComponent {
             IdentLike(String),
