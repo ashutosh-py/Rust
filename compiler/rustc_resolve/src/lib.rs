@@ -36,8 +36,8 @@ use rustc_errors::{Applicability, Diag, ErrCode, ErrorGuaranteed};
 use rustc_expand::base::{DeriveResolution, SyntaxExtension, SyntaxExtensionKind};
 use rustc_feature::BUILTIN_ATTRIBUTES;
 use rustc_hir::def::Namespace::{self, *};
-use rustc_hir::def::NonMacroAttrKind;
 use rustc_hir::def::{self, CtorOf, DefKind, DocLinkResMap, LifetimeRes, PartialRes, PerNS};
+use rustc_hir::def::{FreshLifetimeResId, NonMacroAttrKind};
 use rustc_hir::def_id::{CrateNum, DefId, LocalDefId, LocalDefIdMap};
 use rustc_hir::def_id::{CRATE_DEF_ID, LOCAL_CRATE};
 use rustc_hir::{PrimTy, TraitCandidate};
@@ -1018,6 +1018,9 @@ pub struct Resolver<'a, 'tcx> {
     /// Lifetime parameters that lowering will have to introduce.
     extra_lifetime_params_map: NodeMap<Vec<(Ident, NodeId, LifetimeRes)>>,
 
+    /// The span and the node id of the parent item needed for generating the fresh lifetime.
+    fresh_lifetime_res_info: IndexVec<FreshLifetimeResId, (Span, NodeId)>,
+
     /// `CrateNum` resolutions of `extern crate` items.
     extern_crate_map: FxHashMap<LocalDefId, CrateNum>,
     module_children: LocalDefIdMap<Vec<ModChild>>,
@@ -1419,6 +1422,7 @@ impl<'a, 'tcx> Resolver<'a, 'tcx> {
             label_res_map: Default::default(),
             lifetimes_res_map: Default::default(),
             extra_lifetime_params_map: Default::default(),
+            fresh_lifetime_res_info: IndexVec::default(),
             extern_crate_map: Default::default(),
             module_children: Default::default(),
             trait_map: NodeMap::default(),
@@ -1633,6 +1637,7 @@ impl<'a, 'tcx> Resolver<'a, 'tcx> {
             lifetime_elision_allowed: self.lifetime_elision_allowed,
             lint_buffer: Steal::new(self.lint_buffer),
             delegation_fn_sigs: self.delegation_fn_sigs,
+            fresh_lifetime_res_info: self.fresh_lifetime_res_info,
         };
         ResolverOutputs { global_ctxt, ast_lowering }
     }
