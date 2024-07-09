@@ -4,7 +4,6 @@
 #![allow(internal_features)]
 #![allow(rustc::diagnostic_outside_of_impl)]
 #![allow(rustc::untranslatable_diagnostic)]
-#![feature(array_windows)]
 #![feature(box_patterns)]
 #![feature(debug_closure_helpers)]
 #![feature(if_let_guard)]

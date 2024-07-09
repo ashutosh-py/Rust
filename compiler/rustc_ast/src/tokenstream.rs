@@ -25,7 +25,8 @@ use rustc_serialize::{Decodable, Encodable};
 use rustc_span::{sym, Span, SpanDecoder, SpanEncoder, Symbol, DUMMY_SP};
 
 use std::borrow::Cow;
-use std::{cmp, fmt, iter};
+use std::ops::Range;
+use std::{cmp, fmt, iter, mem};
 
 /// Part of a `TokenStream`.
 #[derive(Debug, Clone, PartialEq, Encodable, Decodable, HashStable_Generic)]
@@ -156,12 +157,195 @@ impl<CTX> HashStable<CTX> for LazyAttrTokenStream {
     }
 }
 
-/// An `AttrTokenStream` is similar to a `TokenStream`, but with extra
-/// information about the tokens for attribute targets. This is used
-/// during expansion to perform early cfg-expansion, and to process attributes
-/// during proc-macro invocations.
-#[derive(Clone, Debug, Default, Encodable, Decodable)]
-pub struct AttrTokenStream(pub Lrc<Vec<AttrTokenTree>>);
+/// Indicates a range of tokens that should be replaced by the tokens in the
+/// provided `AttrsTarget`. This is used in two places during token collection:
+///
+/// 1. During the parsing of an AST node that may have a `#[derive]` attribute,
+///    we parse a nested AST node that has `#[cfg]` or `#[cfg_attr]` In this
+///    case, we use a `ReplaceRange` to replace the entire inner AST node with
+///    `FlatToken::AttrsTarget`, allowing us to perform eager cfg-expansion on
+///    an `AttrTokenStream`.
+///
+/// 2. When we parse an inner attribute while collecting tokens. We remove
+///    inner attributes from the token stream entirely, and instead track them
+///    through the `attrs` field on the AST node. This allows us to easily
+///    manipulate them (for example, removing the first macro inner attribute
+///    to invoke a proc-macro). When create a `TokenStream`, the inner
+///    attributes get inserted into the proper place in the token stream.
+pub type ReplaceRange = (Range<u32>, Option<AttrsTarget>);
+
+// Produces a `TokenStream` on-demand. Using `cursor_snapshot` and `num_calls`,
+// we can reconstruct the `TokenStream` seen by the callback. This allows us to
+// avoid producing a `TokenStream` if it is never needed - for example, a
+// captured `macro_rules!` argument that is never passed to a proc macro. In
+// practice token stream creation happens rarely compared to calls to
+// `collect_tokens` (see some statistics in #78736), so we are doing as little
+// up-front work as possible.
+//
+// This also makes `Parser` very cheap to clone, since there is no intermediate
+// collection buffer to clone.
+pub struct LazyAttrTokenStreamImpl {
+    pub start_token: (Token, Spacing),
+    pub cursor_snapshot: TokenCursor,
+    pub num_calls: u32,
+    pub break_last_token: bool,
+    pub replace_ranges: Box<[ReplaceRange]>,
+}
+
+impl ToAttrTokenStream for LazyAttrTokenStreamImpl {
+    fn to_attr_token_stream(&self) -> AttrTokenStream {
+        // The token produced by the final call to `{,inlined_}next` was not
+        // actually consumed by the callback. The combination of chaining the
+        // initial token and using `take` produces the desired result - we
+        // produce an empty `TokenStream` if no calls were made, and omit the
+        // final token otherwise.
+        let mut cursor_snapshot = self.cursor_snapshot.clone();
+        let tokens = iter::once(FlatToken::Token(self.start_token.clone()))
+            .chain(iter::repeat_with(|| FlatToken::Token(cursor_snapshot.next())))
+            .take(self.num_calls as usize);
+
+        if self.replace_ranges.is_empty() {
+            make_attr_token_stream(tokens, self.break_last_token)
+        } else {
+            let mut tokens: Vec<_> = tokens.collect();
+            let mut replace_ranges = self.replace_ranges.to_vec();
+            replace_ranges.sort_by_key(|(range, _)| range.start);
+
+            #[cfg(debug_assertions)]
+            {
+                for [(range, tokens), (next_range, next_tokens)] in replace_ranges.array_windows() {
+                    assert!(
+                        range.end <= next_range.start || range.end >= next_range.end,
+                        "Replace ranges should either be disjoint or nested: \
+                         ({:?}, {:?}) ({:?}, {:?})",
+                        range,
+                        tokens,
+                        next_range,
+                        next_tokens,
+                    );
+                }
+            }
+
+            // Process the replace ranges, starting from the highest start
+            // position and working our way back. If have tokens like:
+            //
+            // `#[cfg(FALSE)] struct Foo { #[cfg(FALSE)] field: bool }`
+            //
+            // Then we will generate replace ranges for both the `#[cfg(FALSE)]
+            // field: bool` and the entire `#[cfg(FALSE)] struct Foo {
+            // #[cfg(FALSE)] field: bool }`
+            //
+            // By starting processing from the replace range with the greatest
+            // start position, we ensure that any replace range which encloses
+            // another replace range will capture the *replaced* tokens for the
+            // inner range, not the original tokens.
+            for (range, target) in replace_ranges.into_iter().rev() {
+                assert!(!range.is_empty(), "Cannot replace an empty range: {range:?}");
+
+                // Replace the tokens in range with zero or one
+                // `FlatToken::AttrsTarget`s, plus enough `FlatToken::Empty`s
+                // to fill up the rest of the range. This keeps the total
+                // length of `tokens` constant throughout the replacement
+                // process, allowing us to use all of the `ReplaceRanges`
+                // entries without adjusting indices.
+                let target_len = target.is_some() as usize;
+                tokens.splice(
+                    (range.start as usize)..(range.end as usize),
+                    target
+                        .into_iter()
+                        .map(|target| FlatToken::AttrsTarget(target))
+                        .chain(iter::repeat(FlatToken::Empty).take(range.len() - target_len)),
+                );
+            }
+            make_attr_token_stream(tokens.into_iter(), self.break_last_token)
+        }
+    }
+}
+
+/// A helper struct used when building an `AttrTokenStream` from a
+/// `LazyAttrTokenStream`. Both delimiter and non-delimited tokens are stored
+/// as `FlatToken::Token`. A vector of `FlatToken`s is then 'parsed' to build
+/// up an `AttrTokenStream` with nested `AttrTokenTree::Delimited` tokens.
+#[derive(Debug, Clone)]
+enum FlatToken {
+    /// A token. This holds both delimiter (e.g. '{' and '}') and non-delimiter
+    /// tokens.
+    Token((Token, Spacing)),
+    /// Holds the `AttrsTarget` for an AST node. The `AttrsTarget` is inserted
+    /// directly into the constructed `AttrTokenStream` as an
+    /// `AttrTokenTree::AttrsTarget`.
+    AttrsTarget(AttrsTarget),
+    /// A special 'empty' token that is ignored during the conversion to an
+    /// `AttrTokenStream`. This is used to simplify the handling of replace
+    /// ranges.
+    Empty,
+}
+
+/// Converts a flattened iterator of tokens (including open and close delimiter
+/// tokens) into an `AttrTokenStream`, creating an `AttrTokenTree::Delimited`
+/// for each matching pair of open and close delims.
+fn make_attr_token_stream(
+    iter: impl Iterator<Item = FlatToken>,
+    break_last_token: bool,
+) -> AttrTokenStream {
+    #[derive(Debug)]
+    struct FrameData {
+        // This is `None` for the first frame, `Some` for all others.
+        open_delim_sp: Option<(Delimiter, Span, Spacing)>,
+        inner: Vec<AttrTokenTree>,
+    }
+    // The stack always has at least one element. Storing it separately makes for shorter code.
+    let mut stack_top = FrameData { open_delim_sp: None, inner: vec![] };
+    let mut stack_rest = vec![];
+    for flat_token in iter {
+        match flat_token {
+            FlatToken::Token((Token { kind: TokenKind::OpenDelim(delim), span }, spacing)) => {
+                stack_rest.push(mem::replace(
+                    &mut stack_top,
+                    FrameData { open_delim_sp: Some((delim, span, spacing)), inner: vec![] },
+                ));
+            }
+            FlatToken::Token((Token { kind: TokenKind::CloseDelim(delim), span }, spacing)) => {
+                let frame_data = mem::replace(&mut stack_top, stack_rest.pop().unwrap());
+                let (open_delim, open_sp, open_spacing) = frame_data.open_delim_sp.unwrap();
+                assert_eq!(
+                    open_delim, delim,
+                    "Mismatched open/close delims: open={open_delim:?} close={span:?}"
+                );
+                let dspan = DelimSpan::from_pair(open_sp, span);
+                let dspacing = DelimSpacing::new(open_spacing, spacing);
+                let stream = AttrTokenStream::new(frame_data.inner);
+                let delimited = AttrTokenTree::Delimited(dspan, dspacing, delim, stream);
+                stack_top.inner.push(delimited);
+            }
+            FlatToken::Token((token, spacing)) => {
+                stack_top.inner.push(AttrTokenTree::Token(token, spacing))
+            }
+            FlatToken::AttrsTarget(target) => {
+                stack_top.inner.push(AttrTokenTree::AttrsTarget(target))
+            }
+            FlatToken::Empty => {}
+        }
+    }
+
+    if break_last_token {
+        let last_token = stack_top.inner.pop().unwrap();
+        if let AttrTokenTree::Token(last_token, spacing) = last_token {
+            let unglued_first = last_token.kind.break_two_token_op().unwrap().0;
+
+            // An 'unglued' token is always two ASCII characters.
+            let mut first_span = last_token.span.shrink_to_lo();
+            first_span = first_span.with_hi(first_span.lo() + rustc_span::BytePos(1));
+
+            stack_top
+                .inner
+                .push(AttrTokenTree::Token(Token::new(unglued_first, first_span), spacing));
+        } else {
+            panic!("Unexpected last token {last_token:?}")
+        }
+    }
+    AttrTokenStream::new(stack_top.inner)
+}
 
 /// Like `TokenTree`, but for `AttrTokenStream`.
 #[derive(Clone, Debug, Encodable, Decodable)]
@@ -173,6 +357,13 @@ pub enum AttrTokenTree {
     /// See `AttrsTarget` for more information
     AttrsTarget(AttrsTarget),
 }
+
+/// An `AttrTokenStream` is similar to a `TokenStream`, but with extra
+/// information about the tokens for attribute targets. This is used
+/// during expansion to perform early cfg-expansion, and to process attributes
+/// during proc-macro invocations.
+#[derive(Clone, Debug, Default, Encodable, Decodable)]
+pub struct AttrTokenStream(pub Lrc<Vec<AttrTokenTree>>);
 
 impl AttrTokenStream {
     pub fn new(tokens: Vec<AttrTokenTree>) -> AttrTokenStream {
@@ -720,6 +911,75 @@ impl TokenTreeCursor {
     }
 }
 
+/// Iterator over a `TokenStream` that produces `Token`s. It's a bit odd that
+/// we (a) lex tokens into a nice tree structure (`TokenStream`), and then (b)
+/// use this type to emit them as a linear sequence. But a linear sequence is
+/// what the parser expects, for the most part.
+#[derive(Clone, Debug)]
+pub struct TokenCursor {
+    // Cursor for the current (innermost) token stream. The delimiters for this
+    // token stream are found in `self.stack.last()`; when that is `None` then
+    // we are in the outermost token stream which never has delimiters.
+    pub tree_cursor: TokenTreeCursor,
+
+    // Token streams surrounding the current one. The delimiters for stack[n]'s
+    // tokens are in `stack[n-1]`. `stack[0]` (when present) has no delimiters
+    // because it's the outermost token stream which never has delimiters.
+    pub stack: Vec<(TokenTreeCursor, DelimSpan, DelimSpacing, Delimiter)>,
+}
+
+impl TokenCursor {
+    pub fn next(&mut self) -> (Token, Spacing) {
+        self.inlined_next()
+    }
+
+    /// This always-inlined version should only be used on hot code paths.
+    #[inline(always)]
+    pub fn inlined_next(&mut self) -> (Token, Spacing) {
+        loop {
+            // FIXME: we currently don't return `Delimiter::Invisible` open/close delims. To fix
+            // #67062 we will need to, whereupon the `delim != Delimiter::Invisible` conditions
+            // below can be removed.
+            if let Some(tree) = self.tree_cursor.next_ref() {
+                match tree {
+                    &TokenTree::Token(ref token, spacing) => {
+                        debug_assert!(!matches!(
+                            token.kind,
+                            token::OpenDelim(_) | token::CloseDelim(_)
+                        ));
+                        return (token.clone(), spacing);
+                    }
+                    &TokenTree::Delimited(sp, spacing, delim, ref tts) => {
+                        let trees = tts.clone().into_trees();
+                        self.stack.push((
+                            mem::replace(&mut self.tree_cursor, trees),
+                            sp,
+                            spacing,
+                            delim,
+                        ));
+                        if delim != Delimiter::Invisible {
+                            return (Token::new(token::OpenDelim(delim), sp.open), spacing.open);
+                        }
+                        // No open delimiter to return; continue on to the next iteration.
+                    }
+                };
+            } else if let Some((tree_cursor, span, spacing, delim)) = self.stack.pop() {
+                // We have exhausted this token stream. Move back to its parent token stream.
+                self.tree_cursor = tree_cursor;
+                if delim != Delimiter::Invisible {
+                    return (Token::new(token::CloseDelim(delim), span.close), spacing.close);
+                }
+                // No close delimiter to return; continue on to the next iteration.
+            } else {
+                // We have exhausted the outermost token stream. The use of
+                // `Spacing::Alone` is arbitrary and immaterial, because the
+                // `Eof` token's spacing is never used.
+                return (Token::new(token::Eof, DUMMY_SP), Spacing::Alone);
+            }
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Encodable, Decodable, HashStable_Generic)]
 pub struct DelimSpan {
     pub open: Span,
@@ -765,6 +1025,7 @@ mod size_asserts {
     static_assert_size!(AttrTokenStream, 8);
     static_assert_size!(AttrTokenTree, 32);
     static_assert_size!(LazyAttrTokenStream, 8);
+    static_assert_size!(LazyAttrTokenStreamImpl, 96);
     static_assert_size!(Option<LazyAttrTokenStream>, 8); // must be small, used in many AST nodes
     static_assert_size!(TokenStream, 8);
     static_assert_size!(TokenTree, 32);
