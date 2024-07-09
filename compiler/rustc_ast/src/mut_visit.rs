@@ -744,7 +744,7 @@ fn visit_lazy_tts_opt_mut<T: MutVisitor>(lazy_tts: Option<&mut LazyAttrTokenStre
         if let Some(lazy_tts) = lazy_tts {
             let mut tts = lazy_tts.to_attr_token_stream();
             visit_attr_tts(&mut tts, vis);
-            *lazy_tts = LazyAttrTokenStream::new(tts);
+            *lazy_tts = LazyAttrTokenStream::new_direct(tts);
         }
     }
 }

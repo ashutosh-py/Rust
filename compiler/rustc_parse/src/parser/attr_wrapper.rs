@@ -1,7 +1,6 @@
 use super::{Capturing, ForceCollect, Parser, TrailingToken};
 use rustc_ast::token;
-use rustc_ast::tokenstream::ReplaceRange;
-use rustc_ast::tokenstream::{AttrsTarget, LazyAttrTokenStream, LazyAttrTokenStreamImpl};
+use rustc_ast::tokenstream::{AttrsTarget, LazyAttrTokenStream, ReplaceRange};
 use rustc_ast::{self as ast};
 use rustc_ast::{AttrVec, Attribute, HasAttrs, HasTokens};
 use rustc_errors::PResult;
@@ -225,13 +224,13 @@ impl<'a> Parser<'a> {
                 .collect()
         };
 
-        let tokens = LazyAttrTokenStream::new(LazyAttrTokenStreamImpl {
+        let tokens = LazyAttrTokenStream::new_pending(
             start_token,
-            num_calls,
             cursor_snapshot,
-            break_last_token: self.break_last_token,
+            num_calls,
+            self.break_last_token,
             replace_ranges,
-        });
+        );
 
         // If we support tokens and don't already have them, store the newly captured tokens.
         if let Some(target_tokens @ None) = ret.tokens_mut() {
