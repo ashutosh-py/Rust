@@ -16,8 +16,8 @@ use rustc_feature::{AttributeDuplicates, AttributeType, BuiltinAttribute, BUILTI
 use rustc_hir::def_id::LocalModDefId;
 use rustc_hir::intravisit::{self, Visitor};
 use rustc_hir::{
-    self as hir, self, FnSig, ForeignItem, HirId, Item, ItemKind, MethodKind, Safety, Target,
-    TraitItem, CRATE_HIR_ID, CRATE_OWNER_ID,
+    self as hir, self, AssocItemKind, FnSig, ForeignItem, HirId, Item, ItemKind, MethodKind,
+    Safety, Target, TraitItem, CRATE_HIR_ID, CRATE_OWNER_ID,
 };
 use rustc_macros::LintDiagnostic;
 use rustc_middle::hir::nested_filter;
@@ -962,6 +962,23 @@ impl<'tcx> CheckAttrVisitor<'tcx> {
         }
     }
 
+    fn check_doc_search_unbox(&self, meta: &NestedMetaItem, hir_id: HirId) {
+        let hir::Node::Item(item) = self.tcx.hir_node(hir_id) else {
+            self.dcx().emit_err(errors::DocSearchUnboxInvalid { span: meta.span() });
+            return;
+        };
+        match item.kind {
+            ItemKind::Enum(_, generics) | ItemKind::Struct(_, generics)
+                if generics.params.len() != 0 => {}
+            ItemKind::Trait(_, _, generics, _, items)
+                if generics.params.len() != 0
+                    || items.iter().any(|item| matches!(item.kind, AssocItemKind::Type)) => {}
+            _ => {
+                self.dcx().emit_err(errors::DocSearchUnboxInvalid { span: meta.span() });
+            }
+        }
+    }
+
     /// Checks `#[doc(inline)]`/`#[doc(no_inline)]` attributes.
     ///
     /// A doc inlining attribute is invalid if it is applied to a non-`use` item, or
@@ -1177,6 +1194,12 @@ impl<'tcx> CheckAttrVisitor<'tcx> {
                         sym::test => {
                             if self.check_attr_crate_level(attr, meta, hir_id) {
                                 self.check_test_attr(meta, hir_id);
+                            }
+                        }
+
+                        sym::search_unbox => {
+                            if self.check_attr_not_crate_level(meta, hir_id, "fake_variadic") {
+                                self.check_doc_search_unbox(meta, hir_id);
                             }
                         }
 
