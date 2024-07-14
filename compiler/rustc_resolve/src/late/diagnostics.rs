@@ -4,9 +4,10 @@ use crate::diagnostics::{ImportSuggestion, LabelSuggestion, TypoSuggestion};
 use crate::late::{AliasPossibility, LateResolutionVisitor, RibKind};
 use crate::late::{LifetimeBinderKind, LifetimeRes, LifetimeRibKind, LifetimeUseSet};
 use crate::ty::fast_reject::SimplifiedType;
-use crate::{errors, path_names_to_string};
+use crate::{errors, path_names_to_string, Resolver};
 use crate::{Module, ModuleKind, ModuleOrUniformRoot};
 use crate::{PathResult, PathSource, Segment};
+use rustc_attr::collect_doc_alias_symbol_from_attrs;
 use rustc_hir::def::Namespace::{self, *};
 
 use rustc_ast::ptr::P;
@@ -452,6 +453,18 @@ impl<'a: 'ast, 'ast, 'tcx> LateResolutionVisitor<'a, '_, 'ast, 'tcx> {
             return (err, Vec::new());
         }
 
+        if let Some(did) = self.lookup_doc_alias_name(path, source.namespace()) {
+            err.span_label(
+                self.r.def_span(did),
+                format!(
+                    "`{}` has a name defined in the doc alias attribute as `{}`",
+                    self.r.tcx.item_name(did),
+                    path.last().unwrap().ident.as_str()
+                ),
+            );
+            return (err, Vec::new());
+        };
+
         let (found, mut candidates) = self.try_lookup_name_relaxed(
             &mut err,
             source,
@@ -774,6 +787,50 @@ impl<'a: 'ast, 'ast, 'tcx> LateResolutionVisitor<'a, '_, 'ast, 'tcx> {
         }
 
         return (false, candidates);
+    }
+
+    fn lookup_doc_alias_name(&mut self, path: &[Segment], ns: Namespace) -> Option<DefId> {
+        let item_str = path.last().unwrap().ident;
+
+        let find_doc_alias_name = |r: &mut Resolver<'a, '_>, m: Module<'a>| {
+            for resolution in r.resolutions(m).borrow().values() {
+                let Some(did) =
+                    resolution.borrow().binding.and_then(|binding| binding.res().opt_def_id())
+                else {
+                    continue;
+                };
+                if did.is_local() {
+                    // We don't record the doc alias name in the local crate
+                    // because the people who write doc alias are usually not
+                    // confused by them.
+                    continue;
+                }
+                let symbols = collect_doc_alias_symbol_from_attrs(r.tcx.get_attrs(did, sym::doc));
+                if symbols.contains(&item_str.name) {
+                    return Some(did);
+                }
+            }
+            None
+        };
+
+        if path.len() == 1 {
+            for rib in self.ribs[ns].iter().rev() {
+                if let RibKind::Module(module) = rib.kind
+                    && let Some(did) = find_doc_alias_name(self.r, module)
+                {
+                    return Some(did);
+                }
+            }
+        } else {
+            let mod_path = &path[..path.len() - 1];
+            if let PathResult::Module(ModuleOrUniformRoot::Module(module)) =
+                self.resolve_path(mod_path, Some(TypeNS), None)
+                && let Some(did) = find_doc_alias_name(self.r, module)
+            {
+                return Some(did);
+            }
+        }
+        None
     }
 
     fn suggest_trait_and_bounds(
