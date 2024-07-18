@@ -160,7 +160,7 @@ impl<'a> StripUnconfigured<'a> {
         if self.config_tokens {
             if let Some(Some(tokens)) = node.tokens_mut() {
                 let attr_stream = tokens.to_attr_token_stream();
-                *tokens = LazyAttrTokenStream::new(self.configure_tokens(&attr_stream));
+                *tokens = LazyAttrTokenStream::new_direct(self.configure_tokens(&attr_stream));
             }
         }
     }
@@ -191,7 +191,7 @@ impl<'a> StripUnconfigured<'a> {
                     target.attrs.flat_map_in_place(|attr| self.process_cfg_attr(&attr));
 
                     if self.in_cfg(&target.attrs) {
-                        target.tokens = LazyAttrTokenStream::new(
+                        target.tokens = LazyAttrTokenStream::new_direct(
                             self.configure_tokens(&target.tokens.to_attr_token_stream()),
                         );
                         Some(AttrTokenTree::AttrsTarget(target))
@@ -339,7 +339,7 @@ impl<'a> StripUnconfigured<'a> {
         } else {
             vec![AttrTokenTree::Token(pound_token, Spacing::JointHidden), bracket_group]
         };
-        let tokens = Some(LazyAttrTokenStream::new(AttrTokenStream::new(trees)));
+        let tokens = Some(LazyAttrTokenStream::new_direct(AttrTokenStream::new(trees)));
         let attr = attr::mk_attr_from_item(
             &self.sess.psess.attr_id_generator,
             item,

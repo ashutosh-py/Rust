@@ -20,8 +20,8 @@ use path::PathStyle;
 
 use rustc_ast::ptr::P;
 use rustc_ast::token::{self, Delimiter, IdentIsRaw, Nonterminal, Token, TokenKind};
-use rustc_ast::tokenstream::{AttrsTarget, DelimSpacing, DelimSpan, Spacing};
-use rustc_ast::tokenstream::{TokenStream, TokenTree, TokenTreeCursor};
+use rustc_ast::tokenstream::{ReplaceRange, Spacing};
+use rustc_ast::tokenstream::{TokenCursor, TokenStream, TokenTree};
 use rustc_ast::util::case::Case;
 use rustc_ast::{
     self as ast, AnonConst, AttrArgs, AttrArgsEq, AttrId, ByRef, Const, CoroutineKind, DelimArgs,
@@ -34,8 +34,7 @@ use rustc_data_structures::sync::Lrc;
 use rustc_errors::{Applicability, Diag, FatalError, MultiSpan, PResult};
 use rustc_session::parse::ParseSess;
 use rustc_span::symbol::{kw, sym, Ident, Symbol};
-use rustc_span::{Span, DUMMY_SP};
-use std::ops::Range;
+use rustc_span::Span;
 use std::{fmt, mem, slice};
 use thin_vec::ThinVec;
 use tracing::debug;
@@ -202,25 +201,6 @@ struct ClosureSpans {
     body: Span,
 }
 
-/// Indicates a range of tokens that should be replaced by
-/// the tokens in the provided `AttrsTarget`. This is used in two
-/// places during token collection:
-///
-/// 1. During the parsing of an AST node that may have a `#[derive]`
-/// attribute, we parse a nested AST node that has `#[cfg]` or `#[cfg_attr]`
-/// In this case, we use a `ReplaceRange` to replace the entire inner AST node
-/// with `FlatToken::AttrsTarget`, allowing us to perform eager cfg-expansion
-/// on an `AttrTokenStream`.
-///
-/// 2. When we parse an inner attribute while collecting tokens. We
-/// remove inner attributes from the token stream entirely, and
-/// instead track them through the `attrs` field on the AST node.
-/// This allows us to easily manipulate them (for example, removing
-/// the first macro inner attribute to invoke a proc-macro).
-/// When create a `TokenStream`, the inner attributes get inserted
-/// into the proper place in the token stream.
-type ReplaceRange = (Range<u32>, Option<AttrsTarget>);
-
 /// Controls how we capture tokens. Capturing can be expensive,
 /// so we try to avoid performing capturing in cases where
 /// we will never need an `AttrTokenStream`.
@@ -237,75 +217,6 @@ struct CaptureState {
     capturing: Capturing,
     replace_ranges: Vec<ReplaceRange>,
     inner_attr_ranges: FxHashMap<AttrId, ReplaceRange>,
-}
-
-/// Iterator over a `TokenStream` that produces `Token`s. It's a bit odd that
-/// we (a) lex tokens into a nice tree structure (`TokenStream`), and then (b)
-/// use this type to emit them as a linear sequence. But a linear sequence is
-/// what the parser expects, for the most part.
-#[derive(Clone, Debug)]
-struct TokenCursor {
-    // Cursor for the current (innermost) token stream. The delimiters for this
-    // token stream are found in `self.stack.last()`; when that is `None` then
-    // we are in the outermost token stream which never has delimiters.
-    tree_cursor: TokenTreeCursor,
-
-    // Token streams surrounding the current one. The delimiters for stack[n]'s
-    // tokens are in `stack[n-1]`. `stack[0]` (when present) has no delimiters
-    // because it's the outermost token stream which never has delimiters.
-    stack: Vec<(TokenTreeCursor, DelimSpan, DelimSpacing, Delimiter)>,
-}
-
-impl TokenCursor {
-    fn next(&mut self) -> (Token, Spacing) {
-        self.inlined_next()
-    }
-
-    /// This always-inlined version should only be used on hot code paths.
-    #[inline(always)]
-    fn inlined_next(&mut self) -> (Token, Spacing) {
-        loop {
-            // FIXME: we currently don't return `Delimiter::Invisible` open/close delims. To fix
-            // #67062 we will need to, whereupon the `delim != Delimiter::Invisible` conditions
-            // below can be removed.
-            if let Some(tree) = self.tree_cursor.next_ref() {
-                match tree {
-                    &TokenTree::Token(ref token, spacing) => {
-                        debug_assert!(!matches!(
-                            token.kind,
-                            token::OpenDelim(_) | token::CloseDelim(_)
-                        ));
-                        return (token.clone(), spacing);
-                    }
-                    &TokenTree::Delimited(sp, spacing, delim, ref tts) => {
-                        let trees = tts.clone().into_trees();
-                        self.stack.push((
-                            mem::replace(&mut self.tree_cursor, trees),
-                            sp,
-                            spacing,
-                            delim,
-                        ));
-                        if delim != Delimiter::Invisible {
-                            return (Token::new(token::OpenDelim(delim), sp.open), spacing.open);
-                        }
-                        // No open delimiter to return; continue on to the next iteration.
-                    }
-                };
-            } else if let Some((tree_cursor, span, spacing, delim)) = self.stack.pop() {
-                // We have exhausted this token stream. Move back to its parent token stream.
-                self.tree_cursor = tree_cursor;
-                if delim != Delimiter::Invisible {
-                    return (Token::new(token::CloseDelim(delim), span.close), spacing.close);
-                }
-                // No close delimiter to return; continue on to the next iteration.
-            } else {
-                // We have exhausted the outermost token stream. The use of
-                // `Spacing::Alone` is arbitrary and immaterial, because the
-                // `Eof` token's spacing is never used.
-                return (Token::new(token::Eof, DUMMY_SP), Spacing::Alone);
-            }
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1594,26 +1505,6 @@ pub(crate) fn make_unclosed_delims_error(
         unclosed: unmatched.unclosed_span,
     });
     Some(err)
-}
-
-/// A helper struct used when building an `AttrTokenStream` from
-/// a `LazyAttrTokenStream`. Both delimiter and non-delimited tokens
-/// are stored as `FlatToken::Token`. A vector of `FlatToken`s
-/// is then 'parsed' to build up an `AttrTokenStream` with nested
-/// `AttrTokenTree::Delimited` tokens.
-#[derive(Debug, Clone)]
-enum FlatToken {
-    /// A token - this holds both delimiter (e.g. '{' and '}')
-    /// and non-delimiter tokens
-    Token((Token, Spacing)),
-    /// Holds the `AttrsTarget` for an AST node. The `AttrsTarget` is inserted
-    /// directly into the constructed `AttrTokenStream` as an
-    /// `AttrTokenTree::AttrsTarget`.
-    AttrsTarget(AttrsTarget),
-    /// A special 'empty' token that is ignored during the conversion
-    /// to an `AttrTokenStream`. This is used to simplify the
-    /// handling of replace ranges.
-    Empty,
 }
 
 // Metavar captures of various kinds.
