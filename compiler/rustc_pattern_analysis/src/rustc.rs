@@ -25,7 +25,7 @@ use crate::lints::lint_nonexhaustive_missing_variants;
 use crate::pat_column::PatternColumn;
 use crate::rustc::print::EnumInfo;
 use crate::usefulness::{compute_match_usefulness, PlaceValidity};
-use crate::{errors, Captures, PatCx, PrivateUninhabitedField};
+use crate::{errors, PatCx, PrivateUninhabitedField};
 
 mod print;
 
@@ -173,8 +173,7 @@ impl<'p, 'tcx: 'p> RustcPatCtxt<'p, 'tcx> {
         &self,
         ty: RevealedTy<'tcx>,
         variant: &'tcx VariantDef,
-    ) -> impl Iterator<Item = (&'tcx FieldDef, RevealedTy<'tcx>)> + Captures<'p> + Captures<'_>
-    {
+    ) -> impl Iterator<Item = (&'tcx FieldDef, RevealedTy<'tcx>)> {
         let ty::Adt(_, args) = ty.kind() else { bug!() };
         variant.fields.iter().map(move |field| {
             let ty = field.ty(self.tcx, args);
@@ -205,9 +204,7 @@ impl<'p, 'tcx: 'p> RustcPatCtxt<'p, 'tcx> {
         &'a self,
         ctor: &'a Constructor<'p, 'tcx>,
         ty: RevealedTy<'tcx>,
-    ) -> impl Iterator<Item = (RevealedTy<'tcx>, PrivateUninhabitedField)>
-    + ExactSizeIterator
-    + Captures<'a> {
+    ) -> impl Iterator<Item = (RevealedTy<'tcx>, PrivateUninhabitedField)> + ExactSizeIterator {
         fn reveal_and_alloc<'a, 'tcx>(
             cx: &'a RustcPatCtxt<'_, 'tcx>,
             iter: impl Iterator<Item = Ty<'tcx>>,
@@ -942,8 +939,7 @@ impl<'p, 'tcx: 'p> PatCx for RustcPatCtxt<'p, 'tcx> {
         &'a self,
         ctor: &'a crate::constructor::Constructor<Self>,
         ty: &'a Self::Ty,
-    ) -> impl Iterator<Item = (Self::Ty, PrivateUninhabitedField)> + ExactSizeIterator + Captures<'a>
-    {
+    ) -> impl Iterator<Item = (Self::Ty, PrivateUninhabitedField)> + ExactSizeIterator {
         self.ctor_sub_tys(ctor, *ty)
     }
     fn ctors_for_ty(
