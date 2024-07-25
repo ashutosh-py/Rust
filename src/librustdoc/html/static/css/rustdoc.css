@@ -1058,34 +1058,35 @@ so that we can apply CSS-filters to change the arrow color in themes */
 
 .search-results {
 	display: none;
-	margin: 0;
-	padding: 0;
 }
 
 .search-results.active {
 	display: block;
+	margin: 0;
+	padding: 0;
 }
 
-.search-results > li {
-	display: flex;
-	cursor: pointer;
+.search-results > a {
+	display: grid;
+	grid-template-areas:
+		"search-result-name search-result-desc"
+		"search-result-type-signature search-result-type-signature";
+	grid-template-columns: .6fr .4fr;
 	/* A little margin ensures the browser's outlining of focused links has room to display. */
 	margin: 0 2px;
 	border-bottom: 1px solid var(--search-result-border-color);
-	gap: 1em;
+	column-gap: 1em;
 }
 
-.search-results > li > div.desc {
+.search-results > a > div.desc {
 	white-space: nowrap;
 	text-overflow: ellipsis;
 	overflow: hidden;
-	flex: 2;
+	grid-area: search-result-desc;
 }
 
-.search-results li > a:focus,
-.search-results li > a:hover,
-.search-results li:hover > a,
-.search-results li:focus > a {
+.search-results a:focus,
+.search-results a:hover {
 	background-color: var(--search-result-link-focus-background-color);
 }
 
@@ -1093,7 +1094,7 @@ so that we can apply CSS-filters to change the arrow color in themes */
 	display: flex;
 	align-items: center;
 	justify-content: start;
-	flex: 3;
+	grid-area: search-result-name;
 }
 .search-results .result-name .alias {
 	color: var(--search-results-alias-color);
@@ -1113,6 +1114,11 @@ so that we can apply CSS-filters to change the arrow color in themes */
 }
 .search-results .result-name .path > * {
 	display: inline;
+}
+
+.search-results .type-signature {
+	grid-area: search-result-type-signature;
+	white-space: pre-wrap;
 }
 
 .popover {
@@ -1495,8 +1501,7 @@ a.test-arrow:hover {
 	position: relative;
 }
 
-.code-header a.tooltip:hover,
-.search-results a.tooltip:hover {
+.code-header a.tooltip:hover {
 	color: var(--link-color);
 }
 
@@ -2118,15 +2123,15 @@ in src-script.js and main.js
 
 	/* Display an alternating layout on tablets and phones */
 	.item-table, .item-row, .item-table > li, .item-table > li > div,
-	.search-results > li, .search-results > li > div {
+	.search-results > a, .search-results > a > div {
 		display: block;
 	}
 
 	/* Display an alternating layout on tablets and phones */
-	.search-results > li {
+	.search-results > a {
 		padding: 5px 0px;
 	}
-	.search-results > li > div.desc, .item-table > li > div.desc {
+	.search-results > a > div.desc, .item-table > li > div.desc {
 		padding-left: 2em;
 	}
 	.search-results .result-name {
@@ -2807,19 +2812,17 @@ Original by Dempfi (https://github.com/dempfi/ayu)
 	border-right: 1px solid #ffb44c;
 }
 
-:root[data-theme="ayu"] .search-results li:hover > a,
-:root[data-theme="ayu"] .search-results li:focus > a,
-:root[data-theme="ayu"] .search-results li > a:hover,
-:root[data-theme="ayu"] .search-results li > a:focus {
+:root[data-theme="ayu"] .search-results a:hover,
+:root[data-theme="ayu"] .search-results a:focus {
 	color: #fff !important;
 	background-color: #3c3c3c;
 }
 
-:root[data-theme="ayu"] .search-results li > a {
+:root[data-theme="ayu"] .search-results a {
 	color: #0096cf;
 }
 
-:root[data-theme="ayu"] .search-results li div.desc {
+:root[data-theme="ayu"] .search-results a div.desc {
 	color: #c5c5c5;
 }
 

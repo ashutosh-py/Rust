@@ -3097,12 +3097,12 @@ function initSearch(rawSearchIndex) {
                 const longType = longItemTypes[item.ty];
                 const typeName = longType.length !== 0 ? `${longType}` : "?";
 
-                const li = document.createElement("li");
+                const li = document.createElement("a");
                 li.className = "result-" + type;
+                li.href = item.href;
 
-                const resultName = document.createElement("a");
+                const resultName = document.createElement("span");
                 resultName.className = "result-name";
-                resultName.href = item.href;
 
                 resultName.insertAdjacentHTML(
                     "beforeend",
@@ -3126,57 +3126,6 @@ ${item.displayPath}<span class="${type}">${name}</span>\
                 if (item.displayTypeSignature) {
                     const {type, mappedNames, whereClause} = await item.displayTypeSignature;
                     const displayType = document.createElement("div");
-                    if (mappedNames.size > 0 || whereClause.size > 0) {
-                        const tooltip = document.createElement("a");
-                        tooltip.id = `tooltip-${item.id}`;
-                        tooltip.href = `#${tooltip.id}`;
-                        const tooltipCode = document.createElement("code");
-                        for (const [name, qname] of mappedNames) {
-                            // don't care unless the generic name is different
-                            if (name === qname) {
-                                continue;
-                            }
-                            const line = document.createElement("div");
-                            line.className = "where";
-                            line.appendChild(document.createTextNode(`${name} is ${qname}`));
-                            tooltipCode.appendChild(line);
-                        }
-                        for (const [name, innerType] of whereClause) {
-                            // don't care unless there's at least one highlighted entry
-                            if (innerType.length <= 1) {
-                                continue;
-                            }
-                            const line = document.createElement("div");
-                            line.className = "where";
-                            line.appendChild(document.createTextNode(`${name}: `));
-                            innerType.forEach((value, index) => {
-                                if (index % 2 !== 0) {
-                                    const highlight = document.createElement("strong");
-                                    highlight.appendChild(document.createTextNode(value));
-                                    line.appendChild(highlight);
-                                } else {
-                                    line.appendChild(document.createTextNode(value));
-                                }
-                            });
-                            tooltipCode.appendChild(line);
-                        }
-                        if (tooltipCode.childNodes.length !== 0) {
-                            tooltip.RUSTDOC_TOOLTIP_DOM = document.createElement("div");
-                            tooltip.RUSTDOC_TOOLTIP_DOM.className = "content";
-                            const tooltipH3 = document.createElement("h3");
-                            tooltipH3.innerHTML = "About this result";
-                            tooltip.RUSTDOC_TOOLTIP_DOM.appendChild(tooltipH3);
-                            const tooltipPre = document.createElement("pre");
-                            tooltipPre.appendChild(tooltipCode);
-                            tooltip.RUSTDOC_TOOLTIP_DOM.appendChild(tooltipPre);
-                            tooltip.typeWhereClause = whereClause;
-                            tooltip.innerText = "ⓘ";
-                            tooltip.className = "tooltip";
-                            window.rustdocConfigureTooltip(tooltip);
-                            displayType.appendChild(tooltip);
-                            displayType.appendChild(document.createTextNode(" "));
-                        }
-                    }
                     type.forEach((value, index) => {
                         if (index % 2 !== 0) {
                             const highlight = document.createElement("strong");
@@ -3186,27 +3135,55 @@ ${item.displayPath}<span class="${type}">${name}</span>\
                             displayType.appendChild(document.createTextNode(value));
                         }
                     });
+                    if (mappedNames.size > 0 || whereClause.size > 0) {
+                        let addWhereLineFn = () => {
+                            const line = document.createElement("div");
+                            line.className = "where";
+                            line.appendChild(document.createTextNode("where"));
+                            displayType.appendChild(line);
+                            addWhereLineFn = () => {};
+                        };
+                        for (const [name, qname] of mappedNames) {
+                            // don't care unless the generic name is different
+                            if (name === qname) {
+                                continue;
+                            }
+                            addWhereLineFn();
+                            const line = document.createElement("div");
+                            line.className = "where";
+                            line.appendChild(document.createTextNode(`    ${qname} matches `));
+                            const lineStrong = document.createElement("strong");
+                            lineStrong.appendChild(document.createTextNode(name));
+                            line.appendChild(lineStrong);
+                            displayType.appendChild(line);
+                        }
+                        for (const [name, innerType] of whereClause) {
+                            // don't care unless there's at least one highlighted entry
+                            if (innerType.length <= 1) {
+                                continue;
+                            }
+                            addWhereLineFn();
+                            const line = document.createElement("div");
+                            line.className = "where";
+                            line.appendChild(document.createTextNode(`    ${name}: `));
+                            innerType.forEach((value, index) => {
+                                if (index % 2 !== 0) {
+                                    const highlight = document.createElement("strong");
+                                    highlight.appendChild(document.createTextNode(value));
+                                    line.appendChild(highlight);
+                                } else {
+                                    line.appendChild(document.createTextNode(value));
+                                }
+                            });
+                            displayType.appendChild(line);
+                        }
+                    }
                     displayType.className = "type-signature";
-                    description.appendChild(displayType);
+                    li.appendChild(displayType);
                 }
                 description.insertAdjacentHTML("beforeend", item.desc);
 
                 li.appendChild(description);
-                li.tabIndex = -1;
-                li.onclick = () => {
-                    // allow user to select the description text without navigating
-                    // also, they can select the path itself by starting the selection here
-                    // (a UI feature I got used to from DuckDuckGo)
-                    if (window.getSelection) {
-                        const selection = window.getSelection();
-                        if (selection && !selection.isCollapsed) {
-                            return;
-                        }
-                    }
-                    // allow clicking anywhere on the list item to go to the page
-                    // even though the link itself is only the name
-                    resultName.click();
-                };
                 return li;
             }));
             lis.then(lis => {
@@ -4293,17 +4270,17 @@ ${item.displayPath}<span class="${type}">${name}</span>\
             // up and down arrow select next/previous search result, or the
             // search box if we're already at the top.
             if (e.which === 38) { // up
-                const previous = document.activeElement.parentNode.previousElementSibling;
+                const previous = document.activeElement.previousElementSibling;
                 if (previous) {
-                    previous.querySelectorAll("a").item(0).focus();
+                    previous.focus();
                 } else {
                     searchState.focus();
                 }
                 e.preventDefault();
             } else if (e.which === 40) { // down
-                const next = document.activeElement.parentNode.nextElementSibling;
+                const next = document.activeElement.nextElementSibling;
                 if (next) {
-                    next.querySelectorAll("a").item(0).focus();
+                    next.focus();
                 }
                 const rect = document.activeElement.getBoundingClientRect();
                 if (window.innerHeight - rect.bottom < rect.height) {
