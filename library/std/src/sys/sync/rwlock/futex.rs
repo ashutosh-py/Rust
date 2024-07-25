@@ -164,6 +164,11 @@ impl RwLock {
         }
     }
 
+    #[inline]
+    pub unsafe fn downgrade(&self) {
+        todo!()
+    }
+
     #[cold]
     fn write_contended(&self) {
         let mut state = self.spin_write();

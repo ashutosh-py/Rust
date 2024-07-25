@@ -79,6 +79,11 @@ impl RwLock {
         let rwl = self.raw();
         expect_success_aborting(unsafe { abi::rwl_unl_rwl(rwl) }, &"rwl_unl_rwl");
     }
+
+    #[inline]
+    pub unsafe fn downgrade(&self) {
+        todo!()
+    }
 }
 
 impl Drop for RwLock {
