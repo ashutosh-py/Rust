@@ -187,9 +187,6 @@ impl<'ll, 'tcx> IntrinsicCallMethods<'tcx> for Builder<'_, 'll, 'tcx> {
                     Some(instance),
                 )
             }
-            sym::likely => {
-                self.call_intrinsic("llvm.expect.i1", &[args[0].immediate(), self.const_bool(true)])
-            }
             sym::is_val_statically_known => {
                 let intrinsic_type = args[0].layout.immediate_llvm_type(self.cx);
                 let kind = self.type_kind(intrinsic_type);
@@ -210,8 +207,6 @@ impl<'ll, 'tcx> IntrinsicCallMethods<'tcx> for Builder<'_, 'll, 'tcx> {
                     self.const_bool(false)
                 }
             }
-            sym::unlikely => self
-                .call_intrinsic("llvm.expect.i1", &[args[0].immediate(), self.const_bool(false)]),
             sym::select_unpredictable => {
                 let cond = args[0].immediate();
                 assert_eq!(args[1].layout, args[2].layout);
