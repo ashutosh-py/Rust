@@ -6,7 +6,7 @@ use crate::sync::{
     Arc, Barrier, MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLock, RwLockReadGuard,
     RwLockWriteGuard, TryLockError,
 };
-use crate::thread;
+use crate::{thread, time};
 
 #[derive(Eq, PartialEq, Debug)]
 struct NonCopy(i32);
@@ -542,6 +542,9 @@ fn test_downgrade_readers() {
     const R: usize = 16;
     const N: usize = 1000;
 
+    // Starts up 1 writing thread and `R` reader threads.
+    // The writer thread will constantly update the value inside the `RwLock`, and this test will
+    // only pass if every reader observes all values between 0 and `N`.
     let r = Arc::new(RwLock::new(0));
     let b = Arc::new(Barrier::new(R + 1));
 
@@ -586,4 +589,55 @@ fn test_downgrade_readers() {
             }
         });
     }
+}
+
+#[test]
+fn test_downgrade_atomic() {
+    // Spawns many evil writer threads that will try and write to the locked value before the
+    // intial writer who has the exlusive lock can read after it downgrades.
+    // If the `RwLock` behaves correctly, then the initial writer should read the value it wrote
+    // itself as no other thread should get in front of it.
+
+    // The number of evil writer threads.
+    const W: usize = if cfg!(miri) { 100 } else { 1000 };
+    let rw = Arc::new(RwLock::new(0i32));
+
+    // Put the lock in write mode, making all future threads trying to access this go to sleep.
+    let mut main_write_guard = rw.write().unwrap();
+
+    // Spawn all of the evil writer threads.
+    let handles: Vec<_> = (0..W)
+        .map(|_| {
+            let w = rw.clone();
+            thread::spawn(move || {
+                // Will go to sleep since the main thread initially has the write lock.
+                let mut evil_guard = w.write().unwrap();
+                *evil_guard += 1;
+            })
+        })
+        .collect();
+
+    // Wait for a good amount of time so that evil threads go to sleep.
+    // (Note that this is not striclty necessary...)
+    let eternity = time::Duration::from_secs(1);
+    thread::sleep(eternity);
+
+    // Once everyone is asleep, set the value to -1.
+    *main_write_guard = -1;
+
+    // Atomically downgrade the write guard into a read guard.
+    let main_read_guard = RwLockWriteGuard::downgrade(main_write_guard);
+
+    // If the above is not atomic, then it is possible for an evil thread to get in front of this
+    // read and change the value to be non-negative.
+    assert_eq!(*main_read_guard, -1, "`downgrade` was not atomic");
+
+    // Clean up everything now
+    drop(main_read_guard);
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    let final_check = rw.read().unwrap();
+    assert_eq!(*final_check, W as i32 - 1);
 }
