@@ -1327,7 +1327,7 @@ pub trait Iterator {
     /// `take(n)` yields elements until `n` elements are yielded or the end of
     /// the iterator is reached (whichever happens first).
     /// The returned iterator is a prefix of length `n` if the original iterator
-    /// contains at least `n` elements, otherwise it contains all of the
+    /// contains at least `n` elements, otherwise it containss all of the
     /// (fewer than `n`) elements of the original iterator.
     ///
     /// # Examples
@@ -4053,6 +4053,40 @@ pub trait Iterator {
         Self: TrustedRandomAccessNoCoerce,
     {
         unreachable!("Always specialized");
+    }
+
+    /// Returns `true` if the iterator contains a value.
+    ///
+    /// 'contains' is short-circuiting; in other words, it will stop processing
+    /// as soon as the function finds the item in the `Iterator`.
+    ///
+    /// Performance:
+    /// This method checks the whole iterator, which takes O(n) time.
+    /// If the iterator is sorted, or a hash map please use the appropriate method instead.
+    ///
+    /// Example:
+    /// ```
+    /// #![feature(iter_contains)]
+    /// assert!([1, 2, 3].iter().map(|&x| x * 3).contains(&6));
+    /// assert!(![1, 2, 3].iter().contains(&4));
+    /// // You can check if a String is in a string slice iterator.
+    /// assert!(["a", "b", "c"].iter().contains(&"b".to_owned()));
+    /// // You can also check if a String iterator contains a string slice.
+    /// assert!(["a".to_owned(), "b".to_owned(), "c".to_owned()].iter().contains(&"b"));
+    /// ```
+    ///
+    #[unstable(feature = "iter_contains", reason = "new API", issue = "127494")]
+    fn contains<Q: ?Sized>(&mut self, item: Q) -> bool
+    where
+        Q: PartialEq<Self::Item>,
+        Self: Sized,
+    {
+        for element in self {
+            if item == element {
+                return true;
+            }
+        }
+        return false;
     }
 }
 

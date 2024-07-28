@@ -616,6 +616,65 @@ fn test_next_chunk() {
     let mut it = std::iter::repeat_with(|| panic!());
     assert_eq!(it.next_chunk::<0>().unwrap(), []);
 }
+#[test]
+fn test_happy_path_item_not_in_iterator() {
+    assert!(![1i32, 2i32, 3i32].iter().contains(&4i32));
+}
+
+#[test]
+fn test_edge_case_handling_none_values() {
+    assert!([Some(2i32), Option::<i32>::None].iter().contains(&None));
+    assert!([Some(2i32), Option::<i32>::None].iter().contains(&Some(2i32)));
+}
+
+#[test]
+fn test_edge_case_handling_empty_iterator() {
+    assert!(!Vec::<i32>::new().iter().contains(&1i32));
+}
+
+#[test]
+fn test_edge_case_handling_iterator_with_duplicates() {
+    assert!([1i32, 2i32, 2i32, 3i32].iter().contains(&2i32));
+}
+
+#[test]
+/// Tests that short-circuiting works correctly when using `contains`
+/// When you run the function, it should move the iterator forward after the first appearance of the item
+fn test_short_circuiting() {
+    let vector: Vec<i32> = vec![1i32, 2i32, 3i32, 1i32, 1i32];
+    let mut iterator = vector.into_iter();
+    assert!(iterator.contains(1i32));
+    assert_eq!(iterator.next(), Some(2));
+    assert!(!iterator.contains(4i32));
+    assert_eq!(iterator.next(), None);
+}
+
+#[test]
+fn test_edge_case_handling_iterator_with_custom_struct() {
+    #[derive(PartialEq)]
+    struct Item {
+        value: i32,
+    }
+    assert!([Item { value: 1i32 }, Item { value: 2i32 }].iter().contains(&Item { value: 2i32 }));
+}
+
+#[test]
+fn test_str_iterator_contains_string() {
+    assert!(["a", "b", "c"].iter().contains(&"b".to_owned()));
+    assert!(!["a", "b", "c"].iter().contains(&"d".to_owned()));
+}
+
+#[test]
+fn test_str_iterator_contains_string_slice() {
+    assert!(["a", "b", "c"].iter().contains(&"b"));
+    assert!(!["a", "b", "c"].iter().contains(&"d"));
+}
+
+#[test]
+fn test_string_iterator_contains_str_slice() {
+    assert!(["a".to_owned(), "b".to_owned(), "c".to_owned()].iter().contains(&"b"));
+    assert!(!["a".to_owned(), "b".to_owned(), "c".to_owned()].iter().contains(&"d"));
+}
 
 // just tests by whether or not this compiles
 fn _empty_impl_all_auto_traits<T>() {
