@@ -134,7 +134,11 @@ const MASK: usize = !(QUEUE_LOCKED | QUEUED | LOCKED);
 #[inline]
 fn write_lock(state: State) -> Option<State> {
     let state = state.wrapping_byte_add(LOCKED);
-    if state.addr() & LOCKED == LOCKED { Some(state) } else { None }
+    if state.addr() & LOCKED == LOCKED {
+        Some(state)
+    } else {
+        None
+    }
 }
 
 /// Marks the state as read-locked, if possible.
@@ -315,6 +319,7 @@ impl RwLock {
         let mut node = Node::new(write);
         let mut state = self.state.load(Relaxed);
         let mut count = 0;
+        let mut has_slept = false;
         loop {
             if let Some(next) = update(state) {
                 // The lock is available, try locking it.
@@ -322,6 +327,18 @@ impl RwLock {
                     Ok(_) => return,
                     Err(new) => state = new,
                 }
+            } else if !write && has_slept {
+                // If we are trying to read and we have already gone to sleep, first check if the
+                // lock is in read mode before going to sleep again.
+                let tail = unsafe { add_backlinks_and_find_tail(to_node(state)).as_ref() };
+                let _ = tail.next.0.fetch_update(Release, Acquire, |count: *mut Node| {
+                    if count.mask(MASK).addr() > 0 {
+                        Some(without_provenance_mut(state.addr().checked_add(SINGLE)? | LOCKED))
+                    } else {
+                        None
+                    }
+                });
+                todo!("This is very wrong");
             } else if state.addr() & QUEUED == 0 && count < SPIN_COUNT {
                 // If the lock is not available and no threads are queued, spin
                 // for a while, using exponential backoff to decrease cache
@@ -385,6 +402,8 @@ impl RwLock {
                 unsafe {
                     node.wait();
                 }
+
+                has_slept = true;
 
                 // The node was removed from the queue, disarm the guard.
                 mem::forget(guard);
@@ -451,45 +470,44 @@ impl RwLock {
 
     #[inline]
     pub unsafe fn downgrade(&self) {
-        // Atomically set to read-locked with a single reader, without any waiting threads.
-        if let Err(mut state) = self.state.compare_exchange(
+        // Atomically attempt to go from a single writer without any waiting threads to a single
+        // reader without any waiting threads.
+        if let Err(state) = self.state.compare_exchange(
             without_provenance_mut(LOCKED),
             without_provenance_mut(LOCKED | SINGLE),
             Release,
             Relaxed,
         ) {
-            // Attempt to grab the queue lock.
-            loop {
-                let next = state.map_addr(|addr| addr | QUEUE_LOCKED);
-                match self.state.compare_exchange(state, next, AcqRel, Relaxed) {
-                    Err(new_state) => state = new_state,
-                    Ok(new_state) => {
-                        assert_eq!(
-                            new_state.mask(!MASK).addr(),
-                            LOCKED | QUEUED | QUEUE_LOCKED,
-                            "{:p}",
-                            new_state
-                        );
-                        state = new_state;
-                        break;
-                    }
-                }
-            }
-
-            assert_eq!(state.mask(!MASK).addr(), LOCKED | QUEUED | QUEUE_LOCKED);
-
-            // SAFETY: We have the queue lock so all safety contracts are fulfilled.
-            let tail = unsafe { add_backlinks_and_find_tail(to_node(state)).as_ref() };
-
-            // Increment the reader count from 0 to 1.
-            assert_eq!(
-                tail.next.0.fetch_byte_add(SINGLE, AcqRel).addr(),
-                0,
-                "Reader count was not zero while we had the write lock"
+            debug_assert!(
+                state.mask(LOCKED).addr() != 0 && state.mask(QUEUED).addr() != 0,
+                "RwLock should be LOCKED and QUEUED"
             );
 
-            // Release the queue lock.
-            self.state.fetch_byte_sub(QUEUE_LOCKED, Release);
+            // FIXME Is this correct?
+            // SAFETY: Since we have the write lock, nobody else can be modifying state, and since
+            // we got `state` from the `compare_exchange`, we know it is a valid head of the queue.
+            let tail = unsafe { add_backlinks_and_find_tail(to_node(state)) };
+
+            // FIXME Is this safe to modify? There shouldn't be other threads modifying this since
+            // we have the write lock and only we should be able to modify the nodes in the queue...
+            // Increment the reader count from 0 to 1.
+            let old = unsafe { tail.as_ref() }.next.0.fetch_byte_add(SINGLE, AcqRel).addr();
+            debug_assert_eq!(old, 0, "Reader count was not zero while we had the write lock");
+
+            // Now that we are in read mode, traverse the queue and wake up readers until we find a
+            // writer node.
+            let mut current = tail;
+            while unsafe { !current.as_ref().write } {
+                let prev = unsafe { current.as_ref().prev.get() };
+                unsafe {
+                    // There must be threads waiting.
+                    Node::complete(current);
+                }
+                match prev {
+                    Some(prev) => current = prev,
+                    None => return,
+                }
+            }
         }
     }
 
