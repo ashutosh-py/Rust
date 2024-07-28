@@ -134,11 +134,7 @@ const MASK: usize = !(QUEUE_LOCKED | QUEUED | LOCKED);
 #[inline]
 fn write_lock(state: State) -> Option<State> {
     let state = state.wrapping_byte_add(LOCKED);
-    if state.addr() & LOCKED == LOCKED {
-        Some(state)
-    } else {
-        None
-    }
+    if state.addr() & LOCKED == LOCKED { Some(state) } else { None }
 }
 
 /// Marks the state as read-locked, if possible.
