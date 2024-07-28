@@ -22,7 +22,6 @@ pub const False: Bool = 0 as Bool;
 
 #[derive(Copy, Clone, PartialEq)]
 #[repr(C)]
-#[allow(dead_code)] // Variants constructed by C++.
 pub enum LLVMRustResult {
     Success,
     Failure,
@@ -147,10 +146,10 @@ pub enum UnnamedAddr {
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub enum DLLStorageClass {
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     Default = 0,
     DllImport = 1, // Function to be imported from DLL.
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     DllExport = 2, // Function to be accessible from DLL.
 }
 
@@ -161,6 +160,7 @@ pub enum DLLStorageClass {
 #[derive(Copy, Clone, Debug)]
 pub enum AttributeKind {
     AlwaysInline = 0,
+    #[expect(dead_code)]
     ByVal = 1,
     Cold = 2,
     InlineHint = 3,
@@ -176,7 +176,9 @@ pub enum AttributeKind {
     OptimizeForSize = 13,
     ReadOnly = 14,
     SExt = 15,
+    #[expect(dead_code)]
     StructRet = 16,
+    #[expect(dead_code)]
     UWTable = 17,
     ZExt = 18,
     InReg = 19,
@@ -184,7 +186,9 @@ pub enum AttributeKind {
     SanitizeAddress = 21,
     SanitizeMemory = 22,
     NonLazyBind = 23,
+    #[expect(dead_code)]
     OptimizeNone = 24,
+    #[expect(dead_code)]
     ReadNone = 26,
     SanitizeHWAddress = 28,
     WillReturn = 29,
@@ -195,6 +199,7 @@ pub enum AttributeKind {
     SanitizeMemTag = 34,
     NoCfCheck = 35,
     ShadowCallStack = 36,
+    #[expect(dead_code)]
     AllocSize = 37,
     AllocatedPointer = 38,
     AllocAlign = 39,
@@ -289,7 +294,8 @@ impl RealPredicate {
 /// LLVMTypeKind
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(C)]
-pub enum TypeKind {
+#[expect(dead_code)] // FP, see #85677
+pub(crate) enum TypeKind {
     Void = 0,
     Half = 1,
     Float = 2,
@@ -376,7 +382,7 @@ impl AtomicRmwBinOp {
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub enum AtomicOrdering {
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     NotAtomic = 0,
     Unordered = 1,
     Monotonic = 2,
@@ -416,16 +422,24 @@ pub enum FileType {
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub enum MetadataType {
+    #[expect(dead_code)]
     MD_dbg = 0,
+    #[expect(dead_code)]
     MD_tbaa = 1,
+    #[expect(dead_code)]
     MD_prof = 2,
+    #[expect(dead_code)]
     MD_fpmath = 3,
     MD_range = 4,
+    #[expect(dead_code)]
     MD_tbaa_struct = 5,
     MD_invariant_load = 6,
+    #[expect(dead_code)]
     MD_alias_scope = 7,
+    #[expect(dead_code)]
     MD_noalias = 8,
     MD_nontemporal = 9,
+    #[expect(dead_code)]
     MD_mem_parallel_loop_access = 10,
     MD_nonnull = 11,
     MD_align = 17,
@@ -522,7 +536,7 @@ pub enum CodeModel {
 /// LLVMRustDiagnosticKind
 #[derive(Copy, Clone)]
 #[repr(C)]
-#[allow(dead_code)] // Variants constructed by C++.
+#[expect(dead_code)] // Variants constructed by C++.
 pub enum DiagnosticKind {
     Other,
     InlineAsm,
@@ -545,7 +559,6 @@ pub enum DiagnosticKind {
 /// LLVMRustDiagnosticLevel
 #[derive(Copy, Clone)]
 #[repr(C)]
-#[allow(dead_code)] // Variants constructed by C++.
 pub enum DiagnosticLevel {
     Error,
     Warning,
@@ -596,6 +609,7 @@ pub enum ThreadLocalMode {
 /// LLVMRustTailCallKind
 #[derive(Copy, Clone)]
 #[repr(C)]
+#[expect(dead_code)]
 pub enum TailCallKind {
     None,
     Tail,
@@ -661,9 +675,6 @@ pub struct Builder<'a>(InvariantOpaque<'a>);
 #[repr(C)]
 pub struct PassManager<'a>(InvariantOpaque<'a>);
 extern "C" {
-    pub type Pass;
-}
-extern "C" {
     pub type TargetMachine;
 }
 extern "C" {
@@ -694,7 +705,6 @@ extern "C" {
 }
 
 pub type DiagnosticHandlerTy = unsafe extern "C" fn(&DiagnosticInfo, *mut c_void);
-pub type InlineAsmDiagHandlerTy = unsafe extern "C" fn(&SMDiagnostic, *const c_void, c_uint);
 
 pub mod debuginfo {
     use super::{InvariantOpaque, Metadata};
@@ -802,6 +812,7 @@ pub mod debuginfo {
     #[repr(C)]
     pub enum DebugNameTableKind {
         Default,
+        #[expect(dead_code)]
         Gnu,
         None,
     }
@@ -1561,6 +1572,8 @@ extern "C" {
         Name: *const c_char,
         NameLen: size_t,
     ) -> Option<&Value>;
+
+    #[expect(dead_code)]
     pub fn LLVMRustSetTailCallKind(CallInst: &Value, TKC: TailCallKind);
 
     // Operations on attributes
