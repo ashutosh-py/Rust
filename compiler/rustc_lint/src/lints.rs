@@ -653,15 +653,39 @@ pub struct ForLoopsOverFalliblesSuggestion<'a> {
 }
 
 #[derive(Subdiagnostic)]
-pub enum UseLetUnderscoreIgnoreSuggestion {
+pub enum IgnoreSuggestion {
+    #[note(lint_remove_entirely_suggestion)]
+    RemoveEntirelyNote,
+    #[multipart_suggestion(
+        lint_remove_entirely_suggestion,
+        style = "verbose",
+        applicability = "maybe-incorrect"
+    )]
+    RemoveEntirelySuggestion {
+        #[suggestion_part(code = "")]
+        span: Span,
+    },
+    #[note(lint_remove_function_call_suggestion)]
+    RemoveFunctionCallNote,
+    #[multipart_suggestion(
+        lint_remove_function_call_suggestion,
+        style = "verbose",
+        applicability = "maybe-incorrect"
+    )]
+    RemoveFunctionCallSuggestion {
+        #[suggestion_part(code = "")]
+        start_span: Span,
+        #[suggestion_part(code = "")]
+        end_span: Span,
+    },
     #[note(lint_use_let_underscore_ignore_suggestion)]
-    Note,
+    UseLetUnderscoreNote,
     #[multipart_suggestion(
         lint_use_let_underscore_ignore_suggestion,
         style = "verbose",
         applicability = "maybe-incorrect"
     )]
-    Suggestion {
+    UseLetUnderscoreSuggestion {
         #[suggestion_part(code = "let _ = ")]
         start_span: Span,
         #[suggestion_part(code = "")]
@@ -677,7 +701,17 @@ pub struct DropRefDiag<'a> {
     #[label]
     pub label: Span,
     #[subdiagnostic]
-    pub sugg: UseLetUnderscoreIgnoreSuggestion,
+    pub sugg: IgnoreSuggestion,
+}
+
+#[derive(LintDiagnostic)]
+#[diag(lint_dropping_mutable_references)]
+pub struct DropMutRefDiag<'a> {
+    pub arg_ty: Ty<'a>,
+    #[label]
+    pub label: Span,
+    #[subdiagnostic]
+    pub sugg: IgnoreSuggestion,
 }
 
 #[derive(LintDiagnostic)]
@@ -687,7 +721,7 @@ pub struct DropCopyDiag<'a> {
     #[label]
     pub label: Span,
     #[subdiagnostic]
-    pub sugg: UseLetUnderscoreIgnoreSuggestion,
+    pub sugg: IgnoreSuggestion,
 }
 
 #[derive(LintDiagnostic)]
@@ -697,7 +731,17 @@ pub struct ForgetRefDiag<'a> {
     #[label]
     pub label: Span,
     #[subdiagnostic]
-    pub sugg: UseLetUnderscoreIgnoreSuggestion,
+    pub sugg: IgnoreSuggestion,
+}
+
+#[derive(LintDiagnostic)]
+#[diag(lint_forgetting_mutable_references)]
+pub struct ForgetMutRefDiag<'a> {
+    pub arg_ty: Ty<'a>,
+    #[label]
+    pub label: Span,
+    #[subdiagnostic]
+    pub sugg: IgnoreSuggestion,
 }
 
 #[derive(LintDiagnostic)]
@@ -707,7 +751,7 @@ pub struct ForgetCopyDiag<'a> {
     #[label]
     pub label: Span,
     #[subdiagnostic]
-    pub sugg: UseLetUnderscoreIgnoreSuggestion,
+    pub sugg: IgnoreSuggestion,
 }
 
 #[derive(LintDiagnostic)]
