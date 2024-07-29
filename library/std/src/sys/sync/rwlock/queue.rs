@@ -468,7 +468,7 @@ impl RwLock {
     pub unsafe fn downgrade(&self) {
         // Atomically attempt to go from a single writer without any waiting threads to a single
         // reader without any waiting threads.
-        if let Err(state) = self.state.compare_exchange(
+        if let Err(mut state) = self.state.compare_exchange(
             without_provenance_mut(LOCKED),
             without_provenance_mut(LOCKED | SINGLE),
             Release,
@@ -478,7 +478,6 @@ impl RwLock {
                 state.mask(LOCKED).addr() != 0 && state.mask(QUEUED).addr() != 0,
                 "RwLock should be LOCKED and QUEUED"
             );
-
             // 1. Attempt to grab the queue lock
             // 2. Find the tail of the queue
             // 3. While the current tail is not a writer:
@@ -493,29 +492,31 @@ impl RwLock {
             //        number of readers into the current node state or the head state.
 
             // Attempt to grab the queue lock.
-            loop {
-                // Atomically release the lock and try to acquire the queue lock.
-                let next = state.map_addr(|addr| addr | QUEUE_LOCKED);
-                match self.state.compare_exchange_weak(state & !QUEUE_LOCKED, next, AcqRel, Relaxed)
-                {
-                    // The queue lock was acquired. Release it, waking up the next
-                    // waiter in the process.
-                    Ok(_) if state.addr() & QUEUE_LOCKED == 0 => unsafe {
-                        return self.unlock_queue(next);
-                    },
-                    // Another thread already holds the queue lock, leave waking up
-                    // waiters to it.
-                    Ok(_) => return,
-                    Err(new) => state = new,
+            state = loop {
+                match self.state.fetch_update(Release, Acquire, |ptr: State| {
+                    // Go from not queue locked to being queue locked.
+                    if ptr.mask(QUEUE_LOCKED).addr() != 0 {
+                        Some(without_provenance_mut(ptr.addr() | QUEUE_LOCKED))
+                    } else {
+                        None
+                    }
+                }) {
+                    Ok(state) => break state,
+                    Err(_) => {}
                 }
-            }
+            };
+
+            // SAFETY: FIXME
+            let _head = unsafe { to_node(state).as_ref() };
 
             // FIXME Is this correct?
             // SAFETY: Since we have the write lock, nobody else can be modifying state, and since
             // we got `state` from the `compare_exchange`, we know it is a valid head of the queue.
-            let tail = unsafe { add_backlinks_and_find_tail(to_node(state)) };
+            let tail = unsafe { add_backlinks_and_find_tail(to_node(state)).as_ref() };
 
-            todo!()
+            while !tail.write {
+                todo!()
+            }
         }
     }
 
