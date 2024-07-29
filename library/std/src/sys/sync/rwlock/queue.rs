@@ -479,31 +479,43 @@ impl RwLock {
                 "RwLock should be LOCKED and QUEUED"
             );
 
+            // 1. Attempt to grab the queue lock
+            // 2. Find the tail of the queue
+            // 3. While the current tail is not a writer:
+            // 4.     The current tail must be a reader
+            // 5.     Remove the current tail from the queue and update the tail to be the previous
+            //            node if possible
+            // 6.     Set the flag (somewhere on the node) to notify the reader thread that it has
+            //            been woken up by a `downgrade` call
+            // 7.     `complete` the node
+            // 8.     Go back to step 3 with the updated tail if it exists, otherwise break
+            // 9. Once we find a writer or there are no more `prev` links, we write the correct
+            //        number of readers into the current node state or the head state.
+
+            // Attempt to grab the queue lock.
+            loop {
+                // Atomically release the lock and try to acquire the queue lock.
+                let next = state.map_addr(|addr| addr | QUEUE_LOCKED);
+                match self.state.compare_exchange_weak(state & !QUEUE_LOCKED, next, AcqRel, Relaxed)
+                {
+                    // The queue lock was acquired. Release it, waking up the next
+                    // waiter in the process.
+                    Ok(_) if state.addr() & QUEUE_LOCKED == 0 => unsafe {
+                        return self.unlock_queue(next);
+                    },
+                    // Another thread already holds the queue lock, leave waking up
+                    // waiters to it.
+                    Ok(_) => return,
+                    Err(new) => state = new,
+                }
+            }
+
             // FIXME Is this correct?
             // SAFETY: Since we have the write lock, nobody else can be modifying state, and since
             // we got `state` from the `compare_exchange`, we know it is a valid head of the queue.
             let tail = unsafe { add_backlinks_and_find_tail(to_node(state)) };
 
-            // FIXME Is this safe to modify? There shouldn't be other threads modifying this since
-            // we have the write lock and only we should be able to modify the nodes in the queue...
-            // Increment the reader count from 0 to 1.
-            let old = unsafe { tail.as_ref() }.next.0.fetch_byte_add(SINGLE, AcqRel).addr();
-            debug_assert_eq!(old, 0, "Reader count was not zero while we had the write lock");
-
-            // Now that we are in read mode, traverse the queue and wake up readers until we find a
-            // writer node.
-            let mut current = tail;
-            while unsafe { !current.as_ref().write } {
-                let prev = unsafe { current.as_ref().prev.get() };
-                unsafe {
-                    // There must be threads waiting.
-                    Node::complete(current);
-                }
-                match prev {
-                    Some(prev) => current = prev,
-                    None => return,
-                }
-            }
+            todo!()
         }
     }
 
