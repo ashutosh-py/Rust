@@ -43,5 +43,8 @@ impl RwLock {
     }
 
     #[inline]
-    pub unsafe fn downgrade(&self) {}
+    pub unsafe fn downgrade(&self) {
+        // Since there is no difference between read-locked and write-locked on this platform, this
+        // function is a no-op.
+    }
 }
