@@ -277,6 +277,14 @@ impl<T, A: Allocator> RawVec<T, A> {
         self.ptr.as_ptr()
     }
 
+    /// Gets a const raw pointer to the start of the allocation. Note that this is
+    /// `Unique::dangling()` if `capacity == 0` or `T` is zero-sized. In the former case, you must
+    /// be careful.
+    #[inline]
+    pub const fn ptr_const(&self) -> *mut T {
+        self.ptr.as_ptr()
+    }
+
     #[inline]
     pub fn non_null(&self) -> NonNull<T> {
         NonNull::from(self.ptr)

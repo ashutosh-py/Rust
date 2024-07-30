@@ -1252,7 +1252,37 @@ impl<T, A: Allocator> Vec<T, A> {
     #[inline]
     #[stable(feature = "vec_as_slice", since = "1.7.0")]
     pub fn as_slice(&self) -> &[T] {
-        self
+        self.as_slice_const()
+    }
+
+    /// Extracts a slice containing the entire vector.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::borrow::Cow;
+    /// // `Deref`, `AsRef`, and `as_slice` are not available in `const` contexts, so this doesn't otherwise work.
+    /// const fn cow_slice<'c, 's>(c: &Cow<'s, [u8]>) -> &'c [u8]
+    /// where 's: 'c {
+    ///     match c {
+    ///         Cow::Borrowed(s) => s,
+    ///         Cow::Owned(s) => s.as_slice_const(),
+    ///     }
+    /// }
+    ///
+    /// const VEC: Cow<'static, [u8]> = Cow::Owned(Vec::new());
+    /// const SLICE: Cow<'static, [u8]> = Cow::Borrowed(b"foo");
+    ///
+    /// const SLICED_VEC: &'static [u8] = cow_slice(&VEC);
+    /// const SLICED_SLICE: &'static [u8] = cow_slice(&SLICE);
+    ///
+    /// assert_eq!(SLICED_VEC, b"");
+    /// assert_eq!(SLICED_SLICE, b"foo");
+    /// ```
+    #[inline]
+    #[unstable(feature = "const_vec_string_slice", issue = "none")]
+    pub const fn as_slice_const(&self) -> &[T] {
+        unsafe { slice::from_raw_parts(self.as_ptr_const(), self.len) }
     }
 
     /// Extracts a mutable slice of the entire vector.
@@ -1269,7 +1299,7 @@ impl<T, A: Allocator> Vec<T, A> {
     #[inline]
     #[stable(feature = "vec_as_slice", since = "1.7.0")]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
-        self
+        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len) }
     }
 
     /// Returns a raw pointer to the vector's buffer, or a dangling raw pointer
@@ -1330,6 +1360,68 @@ impl<T, A: Allocator> Vec<T, A> {
         // We shadow the slice method of the same name to avoid going through
         // `deref`, which creates an intermediate reference.
         self.buf.ptr()
+    }
+
+    /// Returns a raw pointer to the vector's buffer, or a dangling raw pointer
+    /// valid for zero sized reads if the vector didn't allocate.
+    ///
+    /// This is a `const` version of [`as_ptr`].
+    ///
+    /// The caller must ensure that the vector outlives the pointer this
+    /// function returns, or else it will end up pointing to garbage.
+    /// Modifying the vector may cause its buffer to be reallocated,
+    /// which would also make any pointers to it invalid.
+    ///
+    /// The caller must also ensure that the memory the pointer (non-transitively) points to
+    /// is never written to (except inside an `UnsafeCell`) using this pointer or any pointer
+    /// derived from it. If you need to mutate the contents of the slice, use [`as_mut_ptr`].
+    ///
+    /// This method guarantees that for the purpose of the aliasing model, this method
+    /// does not materialize a reference to the underlying slice, and thus the returned pointer
+    /// will remain valid when mixed with other calls to [`as_ptr`] and [`as_mut_ptr`].
+    /// Note that calling other methods that materialize mutable references to the slice,
+    /// or mutable references to specific elements you are planning on accessing through this pointer,
+    /// as well as writing to those elements, may still invalidate this pointer.
+    /// See the second example below for how this guarantee can be used.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let x = vec![1, 2, 4];
+    /// let x_ptr = x.as_ptr_const();
+    ///
+    /// unsafe {
+    ///     for i in 0..x.len() {
+    ///         assert_eq!(*x_ptr.add(i), 1 << i);
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// Due to the aliasing guarantee, the following code is legal:
+    ///
+    /// ```rust
+    /// unsafe {
+    ///     let mut v = vec![0, 1, 2];
+    ///     let ptr1 = v.as_ptr_const();
+    ///     let _ = ptr1.read();
+    ///     let ptr2 = v.as_mut_ptr().offset(2);
+    ///     ptr2.write(2);
+    ///     // Notably, the write to `ptr2` did *not* invalidate `ptr1`
+    ///     // because it mutated a different element:
+    ///     let _ = ptr1.read();
+    /// }
+    /// ```
+    ///
+    /// [`as_mut_ptr`]: Vec::as_mut_ptr
+    /// [`as_ptr_const`]: Vec::as_ptr
+    #[rustc_never_returns_null_ptr]
+    #[unstable(feature = "const_vec_string_slice", issue = "none")]
+    #[inline]
+    pub const fn as_ptr_const(&self) -> *const T {
+        // We shadow the slice method of the same name to avoid going through
+        // `deref`, which creates an intermediate reference.
+        self.buf.ptr_const()
     }
 
     /// Returns an unsafe mutable pointer to the vector's buffer, or a dangling
@@ -2826,7 +2918,7 @@ impl<T, A: Allocator> ops::Deref for Vec<T, A> {
 
     #[inline]
     fn deref(&self) -> &[T] {
-        unsafe { slice::from_raw_parts(self.as_ptr(), self.len) }
+        self.as_slice()
     }
 }
 
@@ -2834,7 +2926,7 @@ impl<T, A: Allocator> ops::Deref for Vec<T, A> {
 impl<T, A: Allocator> ops::DerefMut for Vec<T, A> {
     #[inline]
     fn deref_mut(&mut self) -> &mut [T] {
-        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len) }
+        self.as_mut_slice()
     }
 }
 

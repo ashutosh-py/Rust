@@ -1023,7 +1023,38 @@ impl String {
     #[must_use]
     #[stable(feature = "string_as_str", since = "1.7.0")]
     pub fn as_str(&self) -> &str {
-        self
+        self.as_str_const()
+    }
+
+    /// Extracts a const string slice containing the entire `String`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::borrow::Cow;
+    /// // `Deref`, `AsRef`, and `as_str` are not available in `const` contexts, so this doesn't otherwise work.
+    /// const fn cow_str<'c, 's>(c: &Cow<'s, str>) -> &'c str
+    /// where 's: 'c {
+    ///     match c {
+    ///         Cow::Borrowed(s) => s,
+    ///         Cow::Owned(s) => s.as_str_const(),
+    ///     }
+    /// }
+    ///
+    /// const STRING: Cow<'static, str> = Cow::Owned(String::new());
+    /// const STR: Cow<'static, str> = Cow::Borrowed("foo");
+    ///
+    /// const SLICED_STRING: &'static str = cow_str(&STRING);
+    /// const SLICED_STR: &'static str = cow_str(&STR);
+    ///
+    /// assert_eq!(SLICED_STRING, "");
+    /// assert_eq!(SLICED_STR, "foo");
+    /// ```
+    #[inline]
+    #[must_use]
+    #[unstable(feature = "const_vec_string_slice", issue = "none")]
+    pub const fn as_str_const(&self) -> &str {
+        unsafe { str::from_utf8_unchecked(self.vec.as_slice_const()) }
     }
 
     /// Converts a `String` into a mutable string slice.
@@ -1042,7 +1073,7 @@ impl String {
     #[must_use]
     #[stable(feature = "string_as_str", since = "1.7.0")]
     pub fn as_mut_str(&mut self) -> &mut str {
-        self
+        unsafe { str::from_utf8_unchecked_mut(&mut self.vec) }
     }
 
     /// Appends a given string slice onto the end of this `String`.
@@ -2484,7 +2515,7 @@ impl ops::Deref for String {
 
     #[inline]
     fn deref(&self) -> &str {
-        unsafe { str::from_utf8_unchecked(&self.vec) }
+        self.as_str()
     }
 }
 
@@ -2495,7 +2526,7 @@ unsafe impl ops::DerefPure for String {}
 impl ops::DerefMut for String {
     #[inline]
     fn deref_mut(&mut self) -> &mut str {
-        unsafe { str::from_utf8_unchecked_mut(&mut *self.vec) }
+        self.as_mut_str()
     }
 }
 
