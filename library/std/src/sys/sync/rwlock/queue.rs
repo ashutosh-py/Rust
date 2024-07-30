@@ -181,6 +181,7 @@ struct Node {
     write: bool,
     thread: OnceCell<Thread>,
     completed: AtomicBool,
+    is_reading: AtomicBool,
 }
 
 impl Node {
@@ -193,6 +194,7 @@ impl Node {
             write,
             thread: OnceCell::new(),
             completed: AtomicBool::new(false),
+            is_reading: AtomicBool::new(false),
         }
     }
 
@@ -317,24 +319,20 @@ impl RwLock {
         let mut count = 0;
         let mut has_slept = false;
         loop {
-            if let Some(next) = update(state) {
+            if node.is_reading.load(Acquire) {
+                // This node was awaken by a call to `downgrade`, which means we are already in read
+                // mode and we can return.
+                debug_assert!(
+                    has_slept,
+                    "Somehow `is_reading` is `true` before the node has gone to sleep"
+                );
+                return;
+            } else if let Some(next) = update(state) {
                 // The lock is available, try locking it.
                 match self.state.compare_exchange_weak(state, next, Acquire, Relaxed) {
                     Ok(_) => return,
                     Err(new) => state = new,
                 }
-            } else if !write && has_slept {
-                // If we are trying to read and we have already gone to sleep, first check if the
-                // lock is in read mode before going to sleep again.
-                let tail = unsafe { add_backlinks_and_find_tail(to_node(state)).as_ref() };
-                let _ = tail.next.0.fetch_update(Release, Acquire, |count: *mut Node| {
-                    if count.mask(MASK).addr() > 0 {
-                        Some(without_provenance_mut(state.addr().checked_add(SINGLE)? | LOCKED))
-                    } else {
-                        None
-                    }
-                });
-                todo!("This is very wrong");
             } else if state.addr() & QUEUED == 0 && count < SPIN_COUNT {
                 // If the lock is not available and no threads are queued, spin
                 // for a while, using exponential backoff to decrease cache
@@ -468,56 +466,82 @@ impl RwLock {
     pub unsafe fn downgrade(&self) {
         // Atomically attempt to go from a single writer without any waiting threads to a single
         // reader without any waiting threads.
-        if let Err(mut state) = self.state.compare_exchange(
+        match self.state.compare_exchange(
             without_provenance_mut(LOCKED),
             without_provenance_mut(LOCKED | SINGLE),
             Release,
             Relaxed,
         ) {
-            debug_assert!(
+            Ok(_) => return,
+            Err(state) => debug_assert!(
                 state.mask(LOCKED).addr() != 0 && state.mask(QUEUED).addr() != 0,
                 "RwLock should be LOCKED and QUEUED"
-            );
-            // 1. Attempt to grab the queue lock
-            // 2. Find the tail of the queue
-            // 3. While the current tail is not a writer:
-            // 4.     The current tail must be a reader
-            // 5.     Remove the current tail from the queue and update the tail to be the previous
-            //            node if possible
-            // 6.     Set the flag (somewhere on the node) to notify the reader thread that it has
-            //            been woken up by a `downgrade` call
-            // 7.     `complete` the node
-            // 8.     Go back to step 3 with the updated tail if it exists, otherwise break
-            // 9. Once we find a writer or there are no more `prev` links, we write the correct
-            //        number of readers into the current node state or the head state.
+            ),
+        }
 
-            // Attempt to grab the queue lock.
-            state = loop {
-                match self.state.fetch_update(Release, Acquire, |ptr: State| {
-                    // Go from not queue locked to being queue locked.
-                    if ptr.mask(QUEUE_LOCKED).addr() != 0 {
-                        Some(without_provenance_mut(ptr.addr() | QUEUE_LOCKED))
-                    } else {
-                        None
-                    }
-                }) {
-                    Ok(state) => break state,
-                    Err(_) => {}
+        // Attempt to grab the queue lock.
+        let state = loop {
+            match self.state.fetch_update(Release, Acquire, |ptr: State| {
+                // Go from not queue locked to being queue locked.
+                if ptr.mask(QUEUE_LOCKED).addr() == 0 {
+                    Some(without_provenance_mut(ptr.addr() | QUEUE_LOCKED))
+                } else {
+                    None
                 }
-            };
+            }) {
+                Ok(state) => break state,
+                Err(_) => {}
+            }
+        };
 
-            // SAFETY: FIXME
-            let _head = unsafe { to_node(state).as_ref() };
+        // SAFETY: By Invariant 2 we know that this tail is valid.
+        let mut tail_ptr = unsafe { add_backlinks_and_find_tail(to_node(state)) };
+        let mut prev_ptr;
 
-            // FIXME Is this correct?
-            // SAFETY: Since we have the write lock, nobody else can be modifying state, and since
-            // we got `state` from the `compare_exchange`, we know it is a valid head of the queue.
-            let tail = unsafe { add_backlinks_and_find_tail(to_node(state)).as_ref() };
+        // We start with 1 reader, which is the current thread.
+        let mut readers = 1;
 
-            while !tail.write {
-                todo!()
+        // Wake up all readers at the top of the queue.
+        loop {
+            // SAFETY: We have the queue lock so nobody else can be modifying the queue or the tail.
+            let tail = unsafe { tail_ptr.as_mut() };
+
+            // If the current `tail` is a writer thread, then we have no readers left to wake.
+            // If there is no valid `prev` backlink, then we don't want to remove this node either
+            // because we will have no `tail` that we can replace this node with.
+            if tail.write || tail.prev.get().is_none() {
+                // Store the reader count in the `next` field.
+                tail.next.0 = AtomicPtr::new(without_provenance_mut(readers));
+                break;
+            }
+
+            prev_ptr = tail.prev.get().expect("Cannot be a `None` variant by the above");
+
+            // SAFETY: By Invariant 2, we know that all `prev` backlinks are valid, and since we
+            // have the queue lock, nobody can be modifying the queue or this node.
+            let prev = unsafe { prev_ptr.as_mut() };
+
+            // Notify the reader thread that they are now in read mode.
+            tail.is_reading.store(true, Release);
+            readers += 1;
+            prev.next.0 = AtomicPtr::new(without_provenance_mut(readers));
+
+            // SAFETY: Because we observed that there were  waiting threads from the first CAS, we
+            // know that the state must have been a valid head to the wait queue as nobody can be
+            // modifying the node itself.
+            let head = unsafe { to_node(self.state.load(Acquire)).as_ref() };
+
+            // Split off the last node and update the `tail` field of `state`.
+            head.tail.set(Some(prev_ptr));
+            tail_ptr = prev_ptr;
+
+            unsafe {
+                Node::complete(tail_ptr);
             }
         }
+
+        // Once we are done updating the queue, release the queue lock.
+        self.state.fetch_byte_sub(QUEUE_LOCKED, Release);
     }
 
     /// # Safety
