@@ -1006,7 +1006,8 @@ impl String {
     #[inline]
     #[must_use = "`self` will be dropped if the result is not used"]
     #[stable(feature = "rust1", since = "1.0.0")]
-    pub fn into_bytes(self) -> Vec<u8> {
+    #[rustc_const_unstable(feature = "const_vec_string_slice")]
+    pub const fn into_bytes(self) -> Vec<u8> {
         self.vec
     }
 
@@ -1022,38 +1023,8 @@ impl String {
     #[inline]
     #[must_use]
     #[stable(feature = "string_as_str", since = "1.7.0")]
-    pub fn as_str(&self) -> &str {
-        self.as_str_const()
-    }
-
-    /// Extracts a const string slice containing the entire `String`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::borrow::Cow;
-    /// // `Deref`, `AsRef`, and `as_str` are not available in `const` contexts, so this doesn't otherwise work.
-    /// const fn cow_str<'c, 's>(c: &Cow<'s, str>) -> &'c str
-    /// where 's: 'c {
-    ///     match c {
-    ///         Cow::Borrowed(s) => s,
-    ///         Cow::Owned(s) => s.as_str_const(),
-    ///     }
-    /// }
-    ///
-    /// const STRING: Cow<'static, str> = Cow::Owned(String::new());
-    /// const STR: Cow<'static, str> = Cow::Borrowed("foo");
-    ///
-    /// const SLICED_STRING: &'static str = cow_str(&STRING);
-    /// const SLICED_STR: &'static str = cow_str(&STR);
-    ///
-    /// assert_eq!(SLICED_STRING, "");
-    /// assert_eq!(SLICED_STR, "foo");
-    /// ```
-    #[inline]
-    #[must_use]
-    #[unstable(feature = "const_vec_string_slice", issue = "none")]
-    pub const fn as_str_const(&self) -> &str {
+    #[rustc_const_unstable(feature = "const_vec_string_slice")]
+    pub const fn as_str(&self) -> &str {
         unsafe { str::from_utf8_unchecked(self.vec.as_slice_const()) }
     }
 
@@ -1143,7 +1114,8 @@ impl String {
     #[inline]
     #[must_use]
     #[stable(feature = "rust1", since = "1.0.0")]
-    pub fn capacity(&self) -> usize {
+    #[rustc_const_unstable(feature = "const_vec_string_slice")]
+    pub const fn capacity(&self) -> usize {
         self.vec.capacity()
     }
 
@@ -1406,7 +1378,8 @@ impl String {
     #[inline]
     #[must_use]
     #[stable(feature = "rust1", since = "1.0.0")]
-    pub fn as_bytes(&self) -> &[u8] {
+    #[rustc_const_unstable(feature = "const_vec_string_slice")]
+    pub const fn as_bytes(&self) -> &[u8] {
         &self.vec
     }
 
@@ -1779,8 +1752,9 @@ impl String {
     #[inline]
     #[must_use]
     #[stable(feature = "rust1", since = "1.0.0")]
+    #[rustc_const_unstable(feature = "const_vec_string_slice")]
     #[rustc_confusables("length", "size")]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.vec.len()
     }
 
@@ -1798,7 +1772,8 @@ impl String {
     #[inline]
     #[must_use]
     #[stable(feature = "rust1", since = "1.0.0")]
-    pub fn is_empty(&self) -> bool {
+    #[rustc_const_unstable(feature = "const_vec_string_slice")]
+    pub const fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
