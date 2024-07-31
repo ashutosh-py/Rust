@@ -1006,7 +1006,7 @@ impl String {
     #[inline]
     #[must_use = "`self` will be dropped if the result is not used"]
     #[stable(feature = "rust1", since = "1.0.0")]
-    #[rustc_const_unstable(feature = "const_vec_string_slice")]
+    #[rustc_const_unstable(feature = "const_vec_string_slice", issue = "none")]
     pub const fn into_bytes(self) -> Vec<u8> {
         self.vec
     }
@@ -1023,9 +1023,9 @@ impl String {
     #[inline]
     #[must_use]
     #[stable(feature = "string_as_str", since = "1.7.0")]
-    #[rustc_const_unstable(feature = "const_vec_string_slice")]
+    #[rustc_const_unstable(feature = "const_vec_string_slice", issue = "none")]
     pub const fn as_str(&self) -> &str {
-        unsafe { str::from_utf8_unchecked(self.vec.as_slice_const()) }
+        unsafe { str::from_utf8_unchecked(self.vec.as_slice()) }
     }
 
     /// Converts a `String` into a mutable string slice.
@@ -1114,7 +1114,7 @@ impl String {
     #[inline]
     #[must_use]
     #[stable(feature = "rust1", since = "1.0.0")]
-    #[rustc_const_unstable(feature = "const_vec_string_slice")]
+    #[rustc_const_unstable(feature = "const_vec_string_slice", issue = "none")]
     pub const fn capacity(&self) -> usize {
         self.vec.capacity()
     }
@@ -1378,9 +1378,9 @@ impl String {
     #[inline]
     #[must_use]
     #[stable(feature = "rust1", since = "1.0.0")]
-    #[rustc_const_unstable(feature = "const_vec_string_slice")]
+    #[rustc_const_unstable(feature = "const_vec_string_slice", issue = "none")]
     pub const fn as_bytes(&self) -> &[u8] {
-        &self.vec
+        self.vec.as_slice()
     }
 
     /// Shortens this `String` to the specified length.
@@ -1752,7 +1752,7 @@ impl String {
     #[inline]
     #[must_use]
     #[stable(feature = "rust1", since = "1.0.0")]
-    #[rustc_const_unstable(feature = "const_vec_string_slice")]
+    #[rustc_const_unstable(feature = "const_vec_string_slice", issue = "none")]
     #[rustc_confusables("length", "size")]
     pub const fn len(&self) -> usize {
         self.vec.len()
@@ -1772,7 +1772,7 @@ impl String {
     #[inline]
     #[must_use]
     #[stable(feature = "rust1", since = "1.0.0")]
-    #[rustc_const_unstable(feature = "const_vec_string_slice")]
+    #[rustc_const_unstable(feature = "const_vec_string_slice", issue = "none")]
     pub const fn is_empty(&self) -> bool {
         self.len() == 0
     }
