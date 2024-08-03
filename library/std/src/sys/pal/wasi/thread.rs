@@ -166,7 +166,6 @@ impl Thread {
     }
 }
 
-pub fn available_parallelism() -> io::Result<NonZero<usize>> {
 fn sleep_with(nanos: u64, clock_id: wasi::Clockid, flags: u16) {
     let clock = wasi::SubscriptionClock { id: clock_id, timeout: nanos, precision: 0, flags };
 
@@ -193,6 +192,6 @@ fn sleep_with(nanos: u64, clock_id: wasi::Clockid, flags: u16) {
     }
 }
 
-pub fn available_parallelism() -> io::Result<NonZeroUsize> {
+pub fn available_parallelism() -> io::Result<NonZero<usize>> {
     unsupported()
 }

@@ -1,5 +1,5 @@
-use std::cell::{Cell, RefCell};
 #![feature(thread_sleep_until)]
+use std::cell::{Cell, RefCell};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
