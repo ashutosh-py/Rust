@@ -1,5 +1,6 @@
 // tidy-alphabetical-start
 #![cfg_attr(all(feature = "nightly", test), feature(stmt_expr_attributes))]
+#![cfg_attr(bootstrap, feature(precise_capturing))]
 #![cfg_attr(feature = "nightly", allow(internal_features))]
 #![cfg_attr(feature = "nightly", feature(extend_one, new_uninit, step_trait, test))]
 #![cfg_attr(feature = "nightly", feature(new_zeroed_alloc))]

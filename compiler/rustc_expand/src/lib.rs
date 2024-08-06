@@ -1,6 +1,7 @@
 // tidy-alphabetical-start
 #![allow(internal_features)]
 #![allow(rustc::diagnostic_outside_of_impl)]
+#![cfg_attr(bootstrap, feature(precise_capturing))]
 #![doc(rust_logo)]
 #![feature(array_windows)]
 #![feature(associated_type_defaults)]
