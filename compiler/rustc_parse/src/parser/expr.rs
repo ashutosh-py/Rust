@@ -1059,34 +1059,30 @@ impl<'a> Parser<'a> {
                 DestructuredFloat::Single(Symbol::intern(i), span)
             }
             // 1.
-            [IdentLike(i), Punct('.')] => {
-                let (ident_span, dot_span) = if can_take_span_apart() {
-                    let (span, ident_len) = (span.data(), BytePos::from_usize(i.len()));
-                    let ident_span = span.with_hi(span.lo + ident_len);
-                    let dot_span = span.with_lo(span.lo + ident_len);
-                    (ident_span, dot_span)
+            [IdentLike(left), Punct('.')] => {
+                let (left_span, dot_span) = if can_take_span_apart() {
+                    let left_span = span.with_hi(span.lo() + BytePos::from_usize(left.len()));
+                    let dot_span = span.with_lo(left_span.hi());
+                    (left_span, dot_span)
                 } else {
                     (span, span)
                 };
-                let symbol = Symbol::intern(i);
-                DestructuredFloat::TrailingDot(symbol, ident_span, dot_span)
+                let left = Symbol::intern(left);
+                DestructuredFloat::TrailingDot(left, left_span, dot_span)
             }
             // 1.2 | 1.2e3
-            [IdentLike(i1), Punct('.'), IdentLike(i2)] => {
-                let (ident1_span, dot_span, ident2_span) = if can_take_span_apart() {
-                    let (span, ident1_len) = (span.data(), BytePos::from_usize(i1.len()));
-                    let ident1_span = span.with_hi(span.lo + ident1_len);
-                    let dot_span = span
-                        .with_lo(span.lo + ident1_len)
-                        .with_hi(span.lo + ident1_len + BytePos(1));
-                    let ident2_span = self.token.span.with_lo(span.lo + ident1_len + BytePos(1));
-                    (ident1_span, dot_span, ident2_span)
+            [IdentLike(left), Punct('.'), IdentLike(right)] => {
+                let (left_span, dot_span, right_span) = if can_take_span_apart() {
+                    let left_span = span.with_hi(span.lo() + BytePos::from_usize(left.len()));
+                    let dot_span = span.with_lo(left_span.hi()).with_hi(left_span.hi() + BytePos(1));
+                    let right_span = span.with_lo(dot_span.hi());
+                    (left_span, dot_span, right_span)
                 } else {
                     (span, span, span)
                 };
-                let symbol1 = Symbol::intern(i1);
-                let symbol2 = Symbol::intern(i2);
-                DestructuredFloat::MiddleDot(symbol1, ident1_span, dot_span, symbol2, ident2_span)
+                let left = Symbol::intern(left);
+                let right = Symbol::intern(right);
+                DestructuredFloat::MiddleDot(left, left_span, dot_span, right, right_span)
             }
             // 1e+ | 1e- (recovered)
             [IdentLike(_), Punct('+' | '-')] |
