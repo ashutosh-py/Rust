@@ -15,7 +15,7 @@ use crate::ast::{
     PathSegment, Safety, DUMMY_NODE_ID,
 };
 use crate::ptr::P;
-use crate::token::{self, CommentKind, Delimiter, Token};
+use crate::token::{self, CommentKind, Delimiter, InvisibleOrigin, MetaVarKind, Token};
 use crate::tokenstream::{DelimSpan, LazyAttrTokenStream, Spacing, TokenStream, TokenTree};
 use crate::util::comments;
 use crate::util::literal::escape_string_symbol;
@@ -364,11 +364,17 @@ impl MetaItem {
                 let span = span.with_hi(segments.last().unwrap().ident.span.hi());
                 Path { span, segments, tokens: None }
             }
-            Some(TokenTree::Token(Token { kind: token::Interpolated(nt), .. }, _)) => match &**nt {
-                token::Nonterminal::NtMeta(item) => return item.meta(item.path.span),
-                token::Nonterminal::NtPath(path) => (**path).clone(),
-                _ => return None,
-            },
+            Some(TokenTree::Delimited(
+                _span,
+                _spacing,
+                Delimiter::Invisible(InvisibleOrigin::MetaVar(
+                    MetaVarKind::Meta | MetaVarKind::Path,
+                )),
+                _stream,
+            )) => {
+                // This path is currently unreachable in the test suite.
+                unreachable!()
+            }
             Some(TokenTree::Token(
                 Token { kind: token::OpenDelim(_) | token::CloseDelim(_), .. },
                 _,
@@ -411,7 +417,7 @@ impl MetaItemKind {
         tokens: &mut impl Iterator<Item = &'a TokenTree>,
     ) -> Option<MetaItemKind> {
         match tokens.next() {
-            Some(TokenTree::Delimited(.., Delimiter::Invisible, inner_tokens)) => {
+            Some(TokenTree::Delimited(.., Delimiter::Invisible(_), inner_tokens)) => {
                 MetaItemKind::name_value_from_tokens(&mut inner_tokens.trees())
             }
             Some(TokenTree::Token(token, _)) => {
@@ -549,7 +555,7 @@ impl NestedMetaItem {
                 tokens.next();
                 return Some(NestedMetaItem::Lit(lit));
             }
-            Some(TokenTree::Delimited(.., Delimiter::Invisible, inner_tokens)) => {
+            Some(TokenTree::Delimited(.., Delimiter::Invisible(_), inner_tokens)) => {
                 tokens.next();
                 return NestedMetaItem::from_tokens(&mut inner_tokens.trees().peekable());
             }

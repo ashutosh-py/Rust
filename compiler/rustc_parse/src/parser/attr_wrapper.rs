@@ -102,7 +102,7 @@ impl ToAttrTokenStream for LazyAttrTokenStreamImpl {
         // produce an empty `TokenStream` if no calls were made, and omit the
         // final token otherwise.
         let mut cursor_snapshot = self.cursor_snapshot.clone();
-        let tokens = iter::once(FlatToken::Token(self.start_token.clone()))
+        let tokens = iter::once(FlatToken::Token(self.start_token))
             .chain(iter::repeat_with(|| FlatToken::Token(cursor_snapshot.next())))
             .take(self.num_calls as usize);
 
@@ -220,7 +220,7 @@ impl<'a> Parser<'a> {
             return Ok(f(self, attrs.attrs)?.0);
         }
 
-        let start_token = (self.token.clone(), self.token_spacing);
+        let start_token = (self.token, self.token_spacing);
         let cursor_snapshot = self.token_cursor.clone();
         let start_pos = self.num_bump_calls;
         let has_outer_attrs = !attrs.attrs.is_empty();
@@ -431,8 +431,8 @@ fn make_attr_token_stream(
             FlatToken::Token((Token { kind: TokenKind::CloseDelim(delim), span }, spacing)) => {
                 let frame_data = mem::replace(&mut stack_top, stack_rest.pop().unwrap());
                 let (open_delim, open_sp, open_spacing) = frame_data.open_delim_sp.unwrap();
-                assert_eq!(
-                    open_delim, delim,
+                assert!(
+                    open_delim.eq_ignoring_invisible_origin(&delim),
                     "Mismatched open/close delims: open={open_delim:?} close={span:?}"
                 );
                 let dspan = DelimSpan::from_pair(open_sp, span);

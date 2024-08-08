@@ -4,7 +4,7 @@ use std::mem;
 use ast::Label;
 use rustc_ast as ast;
 use rustc_ast::ptr::P;
-use rustc_ast::token::{self, Delimiter, TokenKind};
+use rustc_ast::token::{self, Delimiter, MetaVarKind, TokenKind};
 use rustc_ast::util::classify::{self, TrailingBrace};
 use rustc_ast::{
     AttrStyle, AttrVec, Block, BlockCheckMode, Expr, ExprKind, HasAttrs, Local, LocalKind, MacCall,
@@ -22,15 +22,14 @@ use super::path::PathStyle;
 use super::{
     AttrWrapper, BlockMode, FnParseMode, ForceCollect, Parser, Restrictions, SemiColonMode,
 };
-use crate::errors::MalformedLoopLabel;
-use crate::{errors, maybe_whole};
+use crate::errors::{self, MalformedLoopLabel};
 
 impl<'a> Parser<'a> {
     /// Parses a statement. This stops just before trailing semicolons on everything but items.
     /// e.g., a `StmtKind::Semi` parses to a `StmtKind::Expr`, leaving the trailing `;` unconsumed.
     // Public for rustfmt usage.
-    pub(super) fn parse_stmt(&mut self, force_collect: ForceCollect) -> PResult<'a, Option<Stmt>> {
-        Ok(self.parse_stmt_without_recovery(false, force_collect).unwrap_or_else(|e| {
+    pub fn parse_stmt(&mut self, force_collect: ForceCollect) -> PResult<'a, Option<Stmt>> {
+        Ok(self.parse_stmt_without_recovery(false, force_collect, false).unwrap_or_else(|e| {
             e.emit();
             self.recover_stmt_(SemiColonMode::Break, BlockMode::Ignore);
             None
@@ -38,22 +37,26 @@ impl<'a> Parser<'a> {
     }
 
     /// If `force_collect` is [`ForceCollect::Yes`], forces collection of tokens regardless of
-    /// whether or not we have attributes.
-    // Public for `cfg_eval` macro expansion.
+    /// whether or not we have attributes. If `force_full_expr` is true, parses the stmt without
+    /// using `Restriction::STMT_EXPR`. Public for `cfg_eval` macro expansion.
     pub fn parse_stmt_without_recovery(
         &mut self,
         capture_semi: bool,
         force_collect: ForceCollect,
+        force_full_expr: bool,
     ) -> PResult<'a, Option<Stmt>> {
         let attrs = self.parse_outer_attributes()?;
         let lo = self.token.span;
 
-        maybe_whole!(self, NtStmt, |stmt| {
+        if let Some(stmt) = self.eat_metavar_seq(MetaVarKind::Stmt, |this| {
+            this.parse_stmt_without_recovery(false, ForceCollect::Yes, false)
+        }) {
+            let mut stmt = stmt.expect("an actual statement");
             stmt.visit_attrs(|stmt_attrs| {
                 attrs.prepend_to_nt_inner(stmt_attrs);
             });
-            Some(stmt.into_inner())
-        });
+            return Ok(Some(stmt));
+        }
 
         if self.token.is_keyword(kw::Mut) && self.is_keyword_ahead(1, &[kw::Let]) {
             self.bump();
@@ -129,12 +132,12 @@ impl<'a> Parser<'a> {
             self.mk_stmt(lo, StmtKind::Empty)
         } else if self.token != token::CloseDelim(Delimiter::Brace) {
             // Remainder are line-expr stmts.
+            let restrictions =
+                if force_full_expr { Restrictions::empty() } else { Restrictions::STMT_EXPR };
             let e = self.collect_tokens_trailing_token(
                 AttrWrapper::empty(),
                 force_collect,
-                |this, _empty_attrs| {
-                    Ok((this.parse_expr_res(Restrictions::STMT_EXPR, attrs)?, false))
-                },
+                |this, _empty_attrs| Ok((this.parse_expr_res(restrictions, attrs)?, false)),
             )?;
             if matches!(e.kind, ExprKind::Assign(..)) && self.eat_keyword(kw::Else) {
                 let bl = self.parse_block()?;
@@ -447,7 +450,7 @@ impl<'a> Parser<'a> {
         //      bar;
         //
         // which is valid in other languages, but not Rust.
-        match self.parse_stmt_without_recovery(false, ForceCollect::No) {
+        match self.parse_stmt_without_recovery(false, ForceCollect::No, false) {
             // If the next token is an open brace, e.g., we have:
             //
             //     if expr other_expr {
@@ -514,9 +517,11 @@ impl<'a> Parser<'a> {
         blk_mode: BlockCheckMode,
         can_be_struct_literal: bool,
     ) -> PResult<'a, (AttrVec, P<Block>)> {
-        maybe_whole!(self, NtBlock, |block| (AttrVec::new(), block));
+        if let Some(block) = self.eat_metavar_seq(MetaVarKind::Block, |this| this.parse_block()) {
+            return Ok((AttrVec::new(), block));
+        }
 
-        let maybe_ident = self.prev_token.clone();
+        let maybe_ident = self.prev_token;
         self.maybe_recover_unexpected_block_label();
         if !self.eat(&token::OpenDelim(Delimiter::Brace)) {
             return self.error_block_no_opening_brace();
@@ -617,10 +622,24 @@ impl<'a> Parser<'a> {
         &mut self,
         recover: AttemptLocalParseRecovery,
     ) -> PResult<'a, Option<Stmt>> {
-        // Skip looking for a trailing semicolon when we have an interpolated statement.
-        maybe_whole!(self, NtStmt, |stmt| Some(stmt.into_inner()));
+        // Skip looking for a trailing semicolon when we have a metavar seq.
+        if let Some(stmt) = self.eat_metavar_seq(MetaVarKind::Stmt, |this| {
+            // Why pass `true` for `force_full_expr`? Statement expressions are less expressive
+            // than "full" expressions, due to the `STMT_EXPR` restriction, and sometimes need
+            // parentheses. E.g. the "full" expression `match paren_around_match {} | true` when
+            // used in statement context must be written `(match paren_around_match {} | true)`.
+            // However, if the expression we are parsing in this statement context was pasted by a
+            // declarative macro, it may have come from a "full" expression context, and lack
+            // these parentheses. So we lift the `STMT_EXPR` restriction to ensure the statement
+            // will reparse successfully.
+            this.parse_stmt_without_recovery(false, ForceCollect::No, true)
+        }) {
+            let stmt = stmt.expect("an actual statement");
+            return Ok(Some(stmt));
+        }
 
-        let Some(mut stmt) = self.parse_stmt_without_recovery(true, ForceCollect::No)? else {
+        let Some(mut stmt) = self.parse_stmt_without_recovery(true, ForceCollect::No, false)?
+        else {
             return Ok(None);
         };
 
@@ -676,7 +695,7 @@ impl<'a> Parser<'a> {
                                 {
                                     if self.token == token::Colon
                                         && self.look_ahead(1, |token| {
-                                            token.is_whole_block()
+                                            token.is_metavar_block()
                                                 || matches!(
                                                     token.kind,
                                                     token::Ident(
