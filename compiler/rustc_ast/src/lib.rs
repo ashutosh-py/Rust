@@ -37,12 +37,12 @@ pub mod attr;
 pub mod entry;
 pub mod expand;
 pub mod format;
-pub mod mut_visit;
 pub mod node_id;
 pub mod ptr;
 pub mod token;
 pub mod tokenstream;
-pub mod visit;
+pub mod visitors;
+pub use visitors::{visit, mut_visit};
 
 use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 
