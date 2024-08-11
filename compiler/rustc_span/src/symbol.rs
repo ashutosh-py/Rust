@@ -170,6 +170,7 @@ symbols! {
         CallOnceFuture,
         CallRefFuture,
         Capture,
+        Cell,
         Center,
         Cleanup,
         Clone,
