@@ -312,6 +312,9 @@ impl LinkageInfo {
     /// Naked functions are generated as a separate declaration (effectively an extern fn) and
     /// definition (using global assembly). To link them together, some flavor of external linkage
     /// must be used.
+    ///
+    /// This should be just an implementation detail of the backend, which is why this translation
+    /// is made at the final moment.
     pub const fn into_naked_linkage(self) -> Linkage {
         match self {
             // promote Weak linkage to ExternalWeak
