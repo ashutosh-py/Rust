@@ -42,9 +42,8 @@ pub mod ptr;
 pub mod token;
 pub mod tokenstream;
 pub mod visitors;
-pub use visitors::{visit, mut_visit};
-
 use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
+pub use visitors::{mut_visit, visit};
 
 pub use self::ast::*;
 pub use self::ast_traits::{AstDeref, AstNodeWrapper, HasAttrs, HasNodeId, HasTokens};
