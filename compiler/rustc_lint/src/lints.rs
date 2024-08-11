@@ -1129,7 +1129,7 @@ pub(crate) struct IgnoredUnlessCrateSpecified<'a> {
     pub name: Symbol,
 }
 
-// methods.rs
+// dangling.rs
 #[derive(LintDiagnostic)]
 #[diag(lint_instantly_dangling)]
 #[note]
