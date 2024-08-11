@@ -107,7 +107,7 @@ impl AsmBinaryFormat {
     fn from_target(target: &rustc_target::spec::Target) -> Self {
         if target.is_like_windows {
             Self::Coff
-        } else if target.options.vendor == "apple" {
+        } else if target.is_like_osx {
             Self::Macho
         } else {
             Self::Elf
