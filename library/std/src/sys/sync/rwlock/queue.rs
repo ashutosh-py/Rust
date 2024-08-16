@@ -183,11 +183,10 @@ struct Node {
     write: bool,
     thread: OnceCell<Thread>,
     completed: AtomicBool,
-    is_reading: AtomicBool,
 }
 
 impl Node {
-    /// Creates a new queue node.
+    /// Create a new queue node.
     fn new(write: bool) -> Node {
         Node {
             next: AtomicLink::new(None),
@@ -196,7 +195,6 @@ impl Node {
             write,
             thread: OnceCell::new(),
             completed: AtomicBool::new(false),
-            is_reading: AtomicBool::new(false),
         }
     }
 
@@ -338,17 +336,8 @@ impl RwLock {
         let mut node = Node::new(write);
         let mut state = self.state.load(Relaxed);
         let mut count = 0;
-        let mut has_slept = false;
         loop {
-            if node.is_reading.load(Acquire) {
-                // This node was awaken by a call to `downgrade`, which means we are already in read
-                // mode and we can return.
-                debug_assert!(
-                    has_slept,
-                    "Somehow `is_reading` is `true` before the node has gone to sleep"
-                );
-                return;
-            } else if let Some(next) = update(state) {
+            if let Some(next) = update(state) {
                 // The lock is available, try locking it.
                 match self.state.compare_exchange_weak(state, next, Acquire, Relaxed) {
                     Ok(_) => return,
@@ -417,8 +406,6 @@ impl RwLock {
                 unsafe {
                     node.wait();
                 }
-
-                has_slept = true;
 
                 // The node was removed from the queue, disarm the guard.
                 mem::forget(guard);
