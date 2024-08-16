@@ -594,7 +594,7 @@ fn test_downgrade_readers() {
 #[test]
 fn test_downgrade_atomic() {
     // Spawns many evil writer threads that will try and write to the locked value before the
-    // intial writer who has the exlusive lock can read after it downgrades.
+    // initial writer who has the exclusive lock can read after it downgrades.
     // If the `RwLock` behaves correctly, then the initial writer should read the value it wrote
     // itself as no other thread should get in front of it.
 
@@ -618,7 +618,7 @@ fn test_downgrade_atomic() {
         .collect();
 
     // Wait for a good amount of time so that evil threads go to sleep.
-    // (Note that this is not striclty necessary...)
+    // (Note that this is not strictly necessary...)
     let eternity = time::Duration::from_secs(1);
     thread::sleep(eternity);
 

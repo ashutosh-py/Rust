@@ -22,7 +22,7 @@
 //! will scan through the queue and wake up threads as appropriate, which will
 //! then again try to acquire the lock. The resulting [`RwLock`] is:
 //!
-//! * adaptive, since it spins before doing any heavywheight parking operations
+//! * adaptive, since it spins before doing any heavyweight parking operations
 //! * allocation-free, modulo the per-thread [`Thread`] handle, which is
 //! allocated regardless when using threads created by `std`
 //! * writer-preferring, even if some readers may still slip through
@@ -602,7 +602,7 @@ impl RwLock {
                 // Split off `tail`.
                 // There are no set `tail` links before the node pointed to by
                 // `state`, so the first non-null tail field will be current
-                // (invariant 2). Invariant 4 is fullfilled since `find_tail`
+                // (invariant 2). Invariant 4 is fulfilled since `find_tail`
                 // was called on this node, which ensures all backlinks are set.
                 unsafe {
                     to_node(state).as_ref().tail.set(Some(prev));
