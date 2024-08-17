@@ -42,13 +42,13 @@
 //! A single [`AtomicPtr`] is used as state variable. The lowest four bits are used
 //! to indicate the meaning of the remaining bits:
 //!
-//! | [`DOWNGRADE`] | [`LOCKED`] | [`QUEUED`] | [`QUEUE_LOCKED`] | Remaining    |                                                                                                                             |
-//! |:--------------|------------|:-----------|:-----------------|:-------------|:----------------------------------------------------------------------------------------------------------------------------|
-//! | 0             | 0          | 0          | 0                | 0            | The lock is unlocked, no threads are waiting                                                                                |
-//! | 0             | 1          | 0          | 0                | 0            | The lock is write-locked, no threads waiting                                                                                |
-//! | 0             | 1          | 0          | 0                | n > 0        | The lock is read-locked with n readers                                                                                      |
-//! | 0             | 0          | 1          | *                | `*mut Node`  | The lock is unlocked, but some threads are waiting. Only writers may lock the lock                                          |
-//! | *             | 1          | 1          | *                | `*mut Node`  | The lock is locked, but some threads are waiting. If the lock is read-locked, the last queue node contains the reader count |
+//! | [`LOCKED`] | [`QUEUED`] | [`QUEUE_LOCKED`] | [`DOWNGRADE`] | Remaining    |                                                                                                                             |
+//! |------------|:-----------|:-----------------|:--------------|:-------------|:----------------------------------------------------------------------------------------------------------------------------|
+//! | 0          | 0          | 0                | 0             | 0            | The lock is unlocked, no threads are waiting                                                                                |
+//! | 1          | 0          | 0                | 0             | 0            | The lock is write-locked, no threads waiting                                                                                |
+//! | 1          | 0          | 0                | 0             | n > 0        | The lock is read-locked with n readers                                                                                      |
+//! | 0          | 1          | *                | 0             | `*mut Node`  | The lock is unlocked, but some threads are waiting. Only writers may lock the lock                                          |
+//! | 1          | 1          | *                | *             | `*mut Node`  | The lock is locked, but some threads are waiting. If the lock is read-locked, the last queue node contains the reader count |
 //!
 //! ## Waiter queue
 //!
