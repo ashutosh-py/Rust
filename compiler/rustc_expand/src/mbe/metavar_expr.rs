@@ -98,11 +98,8 @@ impl MetaVarExpr {
             _ => {
                 let err_msg = "unrecognized meta-variable expression";
                 let mut err = psess.dcx().struct_span_err(ident.span, err_msg);
-                err.span_suggestion(
-                    ident.span,
+                err.help(
                     "supported expressions are count, ignore, index and len",
-                    "",
-                    Applicability::MachineApplicable,
                 );
                 return Err(err);
             }
