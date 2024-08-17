@@ -194,6 +194,7 @@
 // tidy-alphabetical-start
 #![cfg_attr(bootstrap, feature(asm_const))]
 #![cfg_attr(bootstrap, feature(const_fn_floating_point_arithmetic))]
+#![cfg_attr(bootstrap, feature(const_mut_refs))]
 #![cfg_attr(bootstrap, feature(min_exhaustive_patterns))]
 #![feature(abi_unadjusted)]
 #![feature(adt_const_params)]
@@ -205,7 +206,6 @@
 #![feature(cfg_target_has_atomic_equal_alignment)]
 #![feature(cfg_ub_checks)]
 #![feature(const_for)]
-#![feature(const_mut_refs)]
 #![feature(const_precise_live_drops)]
 #![feature(const_refs_to_cell)]
 #![feature(decl_macro)]
