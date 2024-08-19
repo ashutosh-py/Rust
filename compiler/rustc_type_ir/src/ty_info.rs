@@ -5,7 +5,9 @@ use std::ops::Deref;
 #[cfg(feature = "nightly")]
 use rustc_data_structures::fingerprint::Fingerprint;
 #[cfg(feature = "nightly")]
-use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
+use rustc_data_structures::stable_hasher::{
+    ExtendedHasher, GenericStableHasher, HashStable, StableHasher,
+};
 
 use crate::{DebruijnIndex, TypeFlags};
 
@@ -97,7 +99,7 @@ impl<T: Hash> Hash for WithCachedTypeInfo<T> {
 
 #[cfg(feature = "nightly")]
 impl<T: HashStable<CTX>, CTX> HashStable<CTX> for WithCachedTypeInfo<T> {
-    fn hash_stable(&self, hcx: &mut CTX, hasher: &mut StableHasher) {
+    fn hash_stable<H: ExtendedHasher>(&self, hcx: &mut CTX, hasher: &mut GenericStableHasher<H>) {
         if self.stable_hash == Fingerprint::ZERO || cfg!(debug_assertions) {
             // No cached hash available. This can only mean that incremental is disabled.
             // We don't cache stable hashes in non-incremental mode, because they are used
@@ -106,6 +108,9 @@ impl<T: HashStable<CTX>, CTX> HashStable<CTX> for WithCachedTypeInfo<T> {
             // We need to build the hash as if we cached it and then hash that hash, as
             // otherwise the hashes will differ between cached and non-cached mode.
             let stable_hash: Fingerprint = {
+                // FIXME: Using the generic stable hasher creates a cache coherency issue
+                // so for now always use the `StableHasher` instead.
+                // let mut hasher = GenericStableHasher::<H>::new();
                 let mut hasher = StableHasher::new();
                 self.internee.hash_stable(hcx, &mut hasher);
                 hasher.finish()
