@@ -53,6 +53,14 @@ struct NoMaybeSized<'a, #[pointee] T> {
     ptr: &'a T,
 }
 
+#[derive(SmartPointer)]
+#[repr(transparent)]
+struct PointeeOnField<'a, #[pointee] T: ?Sized> {
+    #[pointee]
+    //~^ ERROR: the `#[pointee]` attribute may only be used on generic parameters
+    ptr: &'a T
+}
+
 // However, reordering attributes should work nevertheless.
 #[repr(transparent)]
 #[derive(SmartPointer)]
