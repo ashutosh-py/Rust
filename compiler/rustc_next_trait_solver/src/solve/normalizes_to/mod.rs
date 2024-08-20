@@ -3,10 +3,9 @@ mod inherent;
 mod opaque_types;
 mod weak_types;
 
-use rustc_type_ir::fast_reject::{DeepRejectCtxt, TreatParams};
 use rustc_type_ir::inherent::*;
 use rustc_type_ir::lang_items::TraitSolverLangItem;
-use rustc_type_ir::{self as ty, Interner, NormalizesTo, Upcast as _};
+use rustc_type_ir::{self as ty, new_reject_ctxt, Interner, NormalizesTo, Upcast as _};
 use tracing::instrument;
 
 use crate::delegate::SolverDelegate;
@@ -144,7 +143,7 @@ where
 
         let goal_trait_ref = goal.predicate.alias.trait_ref(cx);
         let impl_trait_ref = cx.impl_trait_ref(impl_def_id);
-        if !DeepRejectCtxt::new(ecx.cx(), TreatParams::ForLookup).args_may_unify(
+        if !new_reject_ctxt!(ecx.cx(), AsRigid, InstantiateWithInfer).args_may_unify(
             goal.predicate.alias.trait_ref(cx).args,
             impl_trait_ref.skip_binder().args,
         ) {
