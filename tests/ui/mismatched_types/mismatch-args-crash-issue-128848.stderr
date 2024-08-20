@@ -1,5 +1,5 @@
 error[E0061]: this method takes 1 argument but 0 arguments were supplied
-  --> $DIR/issue-128848.rs:6:7
+  --> $DIR/mismatch-args-crash-issue-128848.rs:6:7
    |
 LL |     f.call_once()
    |       ^^^^^^^^^-- argument #1 of type `(_, _, _)` is missing
