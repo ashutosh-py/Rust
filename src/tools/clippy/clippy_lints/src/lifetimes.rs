@@ -523,15 +523,6 @@ impl<'a, 'tcx> Visitor<'tcx> for RefVisitor<'a, 'tcx> {
 
     fn visit_ty(&mut self, ty: &'tcx Ty<'_>) {
         match ty.kind {
-            TyKind::OpaqueDef(opaque, bounds) => {
-                let len = self.lts.len();
-                self.visit_opaque_ty(opaque);
-                self.lts.truncate(len);
-                self.lts.extend(bounds.iter().filter_map(|bound| match bound {
-                    GenericArg::Lifetime(&l) => Some(l),
-                    _ => None,
-                }));
-            },
             TyKind::BareFn(&BareFnTy { decl, .. }) => {
                 let mut sub_visitor = RefVisitor::new(self.cx);
                 sub_visitor.visit_fn_decl(decl);

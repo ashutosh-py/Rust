@@ -3026,7 +3026,7 @@ impl<'tcx> TyCtxt<'tcx> {
 
         loop {
             let parent = self.local_parent(opaque_lifetime_param_def_id);
-            let hir::OpaqueTy { lifetime_mapping, .. } = self.hir().expect_opaque_ty(parent);
+            let lifetime_mapping = self.opaque_captured_lifetimes(parent);
 
             let Some((lifetime, _)) = lifetime_mapping
                 .iter()
@@ -3035,8 +3035,8 @@ impl<'tcx> TyCtxt<'tcx> {
                 bug!("duplicated lifetime param should be present");
             };
 
-            match self.named_bound_var(lifetime.hir_id) {
-                Some(resolve_bound_vars::ResolvedArg::EarlyBound(ebv)) => {
+            match *lifetime {
+                resolve_bound_vars::ResolvedArg::EarlyBound(ebv) => {
                     let new_parent = self.local_parent(ebv);
 
                     // If we map to another opaque, then it should be a parent
@@ -3058,7 +3058,7 @@ impl<'tcx> TyCtxt<'tcx> {
                         },
                     );
                 }
-                Some(resolve_bound_vars::ResolvedArg::LateBound(_, _, lbv)) => {
+                resolve_bound_vars::ResolvedArg::LateBound(_, _, lbv) => {
                     let new_parent = self.local_parent(lbv);
                     return ty::Region::new_late_param(
                         self,
@@ -3069,13 +3069,13 @@ impl<'tcx> TyCtxt<'tcx> {
                         ),
                     );
                 }
-                Some(resolve_bound_vars::ResolvedArg::Error(guar)) => {
+                resolve_bound_vars::ResolvedArg::Error(guar) => {
                     return ty::Region::new_error(self, guar);
                 }
                 _ => {
                     return ty::Region::new_error_with_message(
                         self,
-                        lifetime.ident.span,
+                        self.def_span(opaque_lifetime_param_def_id),
                         "cannot resolve lifetime",
                     );
                 }
