@@ -120,22 +120,6 @@ LL |         fn foo2<T>(&self, x: T) -> T { x }
 LL |         reuse Trait::foo2 { &self.0 }
    |                      ^^^^
 
-warning: this function depends on never type fallback being `()`
-  --> $DIR/not-supported.rs:79:9
-   |
-LL |         fn opaque_ret() -> impl Trait { unimplemented!() }
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
-   = note: for more information, see issue #123748 <https://github.com/rust-lang/rust/issues/123748>
-   = help: specify the types explicitly
-note: in edition 2024, the requirement `!: opaque::Trait` will fail
-  --> $DIR/not-supported.rs:79:28
-   |
-LL |         fn opaque_ret() -> impl Trait { unimplemented!() }
-   |                            ^^^^^^^^^^
-   = note: `#[warn(dependency_on_unit_never_type_fallback)]` on by default
-
 error[E0391]: cycle detected when computing type of `opaque::<impl at $DIR/not-supported.rs:85:5: 85:24>::{synthetic#0}`
   --> $DIR/not-supported.rs:86:25
    |
@@ -169,6 +153,7 @@ note: in edition 2024, the requirement `!: opaque::Trait` will fail
    |
 LL |         pub fn opaque_ret() -> impl Trait { unimplemented!() }
    |                                ^^^^^^^^^^
+   = note: `#[warn(dependency_on_unit_never_type_fallback)]` on by default
 
 error[E0391]: cycle detected when computing type of `opaque::<impl at $DIR/not-supported.rs:88:5: 88:25>::{synthetic#0}`
   --> $DIR/not-supported.rs:89:24
@@ -188,6 +173,21 @@ note: cycle used when checking that `opaque::<impl at $DIR/not-supported.rs:88:5
 LL |     impl ToReuse for u16 {
    |     ^^^^^^^^^^^^^^^^^^^^
    = note: see https://rustc-dev-guide.rust-lang.org/overview.html#queries and https://rustc-dev-guide.rust-lang.org/query.html for more information
+
+warning: this function depends on never type fallback being `()`
+  --> $DIR/not-supported.rs:79:9
+   |
+LL |         fn opaque_ret() -> impl Trait { unimplemented!() }
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+   = note: for more information, see issue #123748 <https://github.com/rust-lang/rust/issues/123748>
+   = help: specify the types explicitly
+note: in edition 2024, the requirement `!: opaque::Trait` will fail
+  --> $DIR/not-supported.rs:79:28
+   |
+LL |         fn opaque_ret() -> impl Trait { unimplemented!() }
+   |                            ^^^^^^^^^^
 
 error: recursive delegation is not supported yet
   --> $DIR/not-supported.rs:102:22
