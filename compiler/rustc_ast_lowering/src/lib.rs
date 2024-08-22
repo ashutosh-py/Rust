@@ -1745,7 +1745,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         // Foo = impl Trait` is, internally, created as a child of the
         // async fn, so the *type parameters* are inherited. It's
         // only the lifetime parameters that we must supply.
-        hir::TyKind::OpaqueDef(opaque_ty_def, generic_args, in_trait)
+        hir::TyKind::OpaqueDef(opaque_ty_def, generic_args)
     }
 
     fn lower_precise_capturing_args(

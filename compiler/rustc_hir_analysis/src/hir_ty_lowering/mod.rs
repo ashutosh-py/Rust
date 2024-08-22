@@ -2068,17 +2068,17 @@ impl<'tcx> dyn HirTyLowerer<'tcx> + '_ {
                 let opt_self_ty = maybe_qself.as_ref().map(|qself| self.lower_ty(qself));
                 self.lower_path(opt_self_ty, path, hir_ty.hir_id, false)
             }
-            &hir::TyKind::OpaqueDef(opaque_ty, lifetimes, in_trait) => {
+            &hir::TyKind::OpaqueDef(opaque_ty, lifetimes) => {
                 let local_def_id = opaque_ty.def_id;
                 // If this is an RPITIT and we are using the new RPITIT lowering scheme, we
                 // generate the def_id of an associated type for the trait and return as
                 // type a projection.
-                let def_id = if in_trait {
+                let def_id = if opaque_ty.in_trait {
                     tcx.associated_type_for_impl_trait_in_trait(local_def_id).to_def_id()
                 } else {
                     local_def_id.to_def_id()
                 };
-                self.lower_opaque_ty(def_id, lifetimes, in_trait)
+                self.lower_opaque_ty(def_id, lifetimes, opaque_ty.in_trait)
             }
             hir::TyKind::Path(hir::QPath::TypeRelative(qself, segment)) => {
                 debug!(?qself, ?segment);

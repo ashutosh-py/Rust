@@ -859,7 +859,7 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
             }
 
             fn visit_ty(&mut self, ty: &'hir hir::Ty<'hir>) {
-                let hir::TyKind::OpaqueDef(opaque_ty, _, _) = ty.kind else {
+                let hir::TyKind::OpaqueDef(opaque_ty, _) = ty.kind else {
                     return hir::intravisit::walk_ty(self, ty);
                 };
                 if let Some(&(_, b)) =

@@ -683,7 +683,7 @@ impl<'a, 'tcx> Visitor<'tcx> for BoundVarContext<'a, 'tcx> {
                 };
                 self.with(scope, |this| this.visit_ty(mt.ty));
             }
-            hir::TyKind::OpaqueDef(opaque_ty, lifetimes, _in_trait) => {
+            hir::TyKind::OpaqueDef(opaque_ty, lifetimes) => {
                 self.visit_opaque_ty(opaque_ty);
 
                 // Resolve the lifetimes in the bounds to the lifetime defs in the generics.
