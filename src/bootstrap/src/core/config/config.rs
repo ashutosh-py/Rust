@@ -2738,12 +2738,17 @@ impl Config {
                 return false;
             }
 
-            self.update_submodule("src/llvm-project");
+            let is_tracked_git_submodule = self.submodules()
+                && GitInfo::new(false, Path::new("src/llvm-project"))
+                    .is_managed_git_subrepository();
 
             // Check for untracked changes in `src/llvm-project`.
-            let has_changes = self
-                .last_modified_commit(&["src/llvm-project"], "download-ci-llvm", true)
-                .is_none();
+            let has_changes = if !is_tracked_git_submodule {
+                false
+            } else {
+                self.update_submodule("src/llvm-project");
+                self.last_modified_commit(&["src/llvm-project"], "download-ci-llvm", true).is_none()
+            };
 
             // Return false if there are untracked changes, otherwise check if CI LLVM is available.
             if has_changes { false } else { llvm::is_ci_llvm_available(self, asserts) }
