@@ -378,21 +378,21 @@ pub(crate) fn create_object_file(sess: &Session) -> Option<write::Object<'static
 fn macho_object_build_version_for_target(target: &Target) -> object::write::MachOBuildVersion {
     /// The `object` crate demands "X.Y.Z encoded in nibbles as xxxx.yy.zz"
     /// e.g. minOS 14.0 = 0x000E0000, or SDK 16.2 = 0x00100200
-    fn pack_version((major, minor): (u32, u32)) -> u32 {
-        (major << 16) | (minor << 8)
+    fn pack_version((major, minor, patch): (u16, u8, u8)) -> u32 {
+        let (major, minor, patch) = (major as u32, minor as u32, patch as u32);
+        (major << 16) | (minor << 8) | patch
     }
 
     let platform =
         rustc_target::spec::current_apple_platform(target).expect("unknown Apple target OS");
-    let min_os = rustc_target::spec::current_apple_deployment_target(target)
-        .expect("unknown Apple target OS");
-    let sdk =
+    let min_os = rustc_target::spec::current_apple_deployment_target(target);
+    let (sdk_major, sdk_minor) =
         rustc_target::spec::current_apple_sdk_version(platform).expect("unknown Apple target OS");
 
     let mut build_version = object::write::MachOBuildVersion::default();
     build_version.platform = platform;
     build_version.minos = pack_version(min_os);
-    build_version.sdk = pack_version(sdk);
+    build_version.sdk = pack_version((sdk_major, sdk_minor, 0));
     build_version
 }
 
