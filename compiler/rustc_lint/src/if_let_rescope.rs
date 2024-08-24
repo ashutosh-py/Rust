@@ -19,7 +19,6 @@ declare_lint! {
     /// ### Example
     ///
     /// ```rust,edition2021
-    /// #![feature(if_let_rescope)]
     /// #![warn(if_let_rescope)]
     /// #![allow(unused_variables)]
     ///
@@ -91,7 +90,7 @@ declare_lint_pass!(
 
 impl<'tcx> LateLintPass<'tcx> for IfLetRescope {
     fn check_expr(&mut self, cx: &LateContext<'tcx>, expr: &'tcx hir::Expr<'tcx>) {
-        if !expr.span.edition().at_least_rust_2021() || !cx.tcx.features().if_let_rescope {
+        if !expr.span.edition().at_least_rust_2021() {
             return;
         }
         let hir::ExprKind::If(cond, conseq, alt) = expr.kind else { return };
