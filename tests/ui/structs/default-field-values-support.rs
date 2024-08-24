@@ -10,9 +10,9 @@ pub struct Foo {
     pub baz: i32 = 42 + 3,
 }
 
-// #[derive(Default)]
+#[derive(Default)]
 pub enum Bar {
-    // #[default]
+    #[default]
     Foo {
         bar: S = S,
         baz: i32 = 42 + 3,
@@ -29,10 +29,10 @@ fn main () {
     assert_eq!(1, z.baz);
 
     let x = Bar::Foo { .. };
-    // let y = Bar::default();
+    let y = Bar::default();
     let z = Bar::Foo { baz: 1, .. };
 
     assert!(matches!(Bar::Foo { bar: S, baz: 45 }, x));
-    // assert!(matches!(Bar::Foo { bar: S, baz: 45 }, y));
+    assert!(matches!(Bar::Foo { bar: S, baz: 45 }, y));
     assert!(matches!(Bar::Foo { bar: S, baz: 1 }, z));
 }
