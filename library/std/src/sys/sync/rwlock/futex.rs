@@ -135,7 +135,7 @@ impl RwLock {
             }
 
             // Check for overflow.
-            assert!(has_reached_max_readers(state), "too many active read locks on RwLock");
+            assert!(!has_reached_max_readers(state), "too many active read locks on RwLock");
 
             // Make sure the readers waiting bit is set before we go to sleep.
             if !has_readers_waiting(state) {
