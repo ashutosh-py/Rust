@@ -1,6 +1,6 @@
 //@ run-pass
 #![feature(default_field_values)]
-#![allow(unused_variables)]
+#![allow(unused_variables, dead_code)]
 
 pub struct S;
 
@@ -19,6 +19,29 @@ pub enum Bar {
     }
 }
 
+#[derive(Default)]
+pub struct Qux {
+    bar: S = Self::S,
+    baz: i32 = foo(),
+    bat: i32 = <Qux as T>::K,
+}
+
+impl Qux {
+    const S: S = S;
+}
+
+trait T {
+    const K: i32;
+}
+
+impl T for Qux {
+    const K: i32 = 2;
+}
+
+const fn foo() -> i32 {
+    42
+}
+
 fn main () {
     let x = Foo { .. };
     let y = Foo::default();
@@ -35,4 +58,7 @@ fn main () {
     assert!(matches!(Bar::Foo { bar: S, baz: 45 }, x));
     assert!(matches!(Bar::Foo { bar: S, baz: 45 }, y));
     assert!(matches!(Bar::Foo { bar: S, baz: 1 }, z));
+
+    let x = Qux { .. };
+    assert!(matches!(Qux { bar: S, baz: 42, bat: 2 }, x));
 }
