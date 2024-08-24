@@ -976,7 +976,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     fn check_pat_struct(
         &self,
         pat: &'tcx Pat<'tcx>,
-        qpath: &hir::QPath<'tcx>,
+        qpath: &'tcx hir::QPath<'tcx>,
         fields: &'tcx [hir::PatField<'tcx>],
         has_rest_pat: bool,
         expected: Ty<'tcx>,
@@ -1281,7 +1281,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         res: Res,
         qpath: &hir::QPath<'_>,
         subpats: &'tcx [Pat<'tcx>],
-        fields: &'tcx [ty::FieldDef],
+        fields: &'tcx [ty::FieldDef<'tcx>],
         expected: Ty<'tcx>,
         had_err: Result<(), ErrorGuaranteed>,
     ) -> ErrorGuaranteed {
@@ -1475,7 +1475,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         &self,
         adt_ty: Ty<'tcx>,
         pat: &'tcx Pat<'tcx>,
-        variant: &'tcx ty::VariantDef,
+        variant: &'tcx ty::VariantDef<'tcx>,
         fields: &'tcx [hir::PatField<'tcx>],
         has_rest_pat: bool,
         pat_info: PatInfo<'tcx, '_>,
@@ -1624,7 +1624,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
     fn error_tuple_variant_index_shorthand(
         &self,
-        variant: &VariantDef,
+        variant: &VariantDef<'tcx>,
         pat: &'_ Pat<'_>,
         fields: &[hir::PatField<'_>],
     ) -> Result<(), ErrorGuaranteed> {
@@ -1699,9 +1699,9 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         &self,
         kind_name: &str,
         inexistent_fields: &[&hir::PatField<'tcx>],
-        unmentioned_fields: &mut Vec<(&'tcx ty::FieldDef, Ident)>,
+        unmentioned_fields: &mut Vec<(&'tcx ty::FieldDef<'tcx>, Ident)>,
         pat: &'tcx Pat<'tcx>,
-        variant: &ty::VariantDef,
+        variant: &ty::VariantDef<'tcx>,
         args: ty::GenericArgsRef<'tcx>,
     ) -> Diag<'a> {
         let tcx = self.tcx;
@@ -1807,7 +1807,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         &self,
         pat: &Pat<'_>,
         fields: &'tcx [hir::PatField<'tcx>],
-        variant: &ty::VariantDef,
+        variant: &ty::VariantDef<'tcx>,
     ) -> Result<(), ErrorGuaranteed> {
         if let (Some(CtorKind::Fn), PatKind::Struct(qpath, pattern_fields, ..)) =
             (variant.ctor_kind(), &pat.kind)
@@ -1854,7 +1854,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     fn get_suggested_tuple_struct_pattern(
         &self,
         fields: &[hir::PatField<'_>],
-        variant: &VariantDef,
+        variant: &VariantDef<'tcx>,
     ) -> String {
         let variant_field_idents =
             variant.fields.iter().map(|f| f.ident(self.tcx)).collect::<Vec<Ident>>();
@@ -1935,7 +1935,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     fn lint_non_exhaustive_omitted_patterns(
         &self,
         pat: &Pat<'_>,
-        unmentioned_fields: &[(&ty::FieldDef, Ident)],
+        unmentioned_fields: &[(&ty::FieldDef<'tcx>, Ident)],
         ty: Ty<'tcx>,
     ) {
         fn joined_uncovered_patterns(witnesses: &[&Ident]) -> String {
@@ -1986,7 +1986,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     fn error_unmentioned_fields(
         &self,
         pat: &Pat<'_>,
-        unmentioned_fields: &[(&ty::FieldDef, Ident)],
+        unmentioned_fields: &[(&ty::FieldDef<'tcx>, Ident)],
         have_inaccessible_fields: bool,
         fields: &'tcx [hir::PatField<'tcx>],
     ) -> Diag<'a> {

@@ -1103,7 +1103,7 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
         kind: DefKind,
         index: DefIndex,
         parent_did: DefId,
-    ) -> (VariantIdx, ty::VariantDef) {
+    ) -> (VariantIdx, ty::VariantDef<'tcx>) {
         let adt_kind = match kind {
             DefKind::Variant => ty::AdtKind::Enum,
             DefKind::Struct => ty::AdtKind::Struct,
@@ -1129,6 +1129,7 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
                         did,
                         name: self.item_name(did.index),
                         vis: self.get_visibility(did.index),
+                        value: None,
                     })
                     .collect(),
                 adt_kind,

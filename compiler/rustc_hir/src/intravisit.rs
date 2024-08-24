@@ -756,7 +756,9 @@ pub fn walk_expr<'v, V: Visitor<'v>>(visitor: &mut V, expression: &'v Expr<'v>) 
         ExprKind::Struct(ref qpath, fields, ref optional_base) => {
             try_visit!(visitor.visit_qpath(qpath, expression.hir_id, expression.span));
             walk_list!(visitor, visit_expr_field, fields);
-            visit_opt!(visitor, visit_expr, optional_base);
+            if let Rest::Base(base) = optional_base {
+                try_visit!(visitor.visit_expr(base));
+            }
         }
         ExprKind::Tup(subexpressions) => {
             walk_list!(visitor, visit_expr, subexpressions);
@@ -1197,6 +1199,7 @@ pub fn walk_struct_def<'v, V: Visitor<'v>>(
 pub fn walk_field_def<'v, V: Visitor<'v>>(visitor: &mut V, field: &'v FieldDef<'v>) -> V::Result {
     try_visit!(visitor.visit_id(field.hir_id));
     try_visit!(visitor.visit_ident(field.ident));
+    visit_opt!(visitor, visit_anon_const, &field.value);
     visitor.visit_ty(field.ty)
 }
 

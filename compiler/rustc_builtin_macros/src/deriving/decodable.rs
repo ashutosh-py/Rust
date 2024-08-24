@@ -216,7 +216,7 @@ where
             let fields = fields
                 .iter()
                 .enumerate()
-                .map(|(i, &(ident, span))| {
+                .map(|(i, &(ident, span, _))| {
                     let arg = getarg(cx, span, ident.name, i);
                     cx.field_imm(span, ident, arg)
                 })

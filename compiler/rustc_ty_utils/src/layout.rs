@@ -547,7 +547,7 @@ fn layout_of_uncached<'tcx>(
                 ));
             }
 
-            let err_if_unsized = |field: &FieldDef, err_msg: &str| {
+            let err_if_unsized = |field: &FieldDef<'_>, err_msg: &str| {
                 let field_ty = tcx.type_of(field.did);
                 let is_unsized = tcx
                     .try_instantiate_and_normalize_erasing_regions(args, cx.param_env, field_ty)

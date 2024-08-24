@@ -347,9 +347,10 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                     })
                     .collect();
 
-                let field_names = adt_def.variant(variant_index).fields.indices();
+                let variant = adt_def.variant(variant_index);
+                let field_names = variant.fields.indices();
 
-                let fields = if let Some(FruInfo { base, field_types }) = base {
+                let fields = if let Rest::Base(FruInfo { base, field_types }) = base {
                     let place_builder = unpack!(block = this.as_place_builder(block, *base));
 
                     // MIR does not natively support FRU, so for each
@@ -361,6 +362,50 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                             None => {
                                 let place = place_builder.clone_project(PlaceElem::Field(n, *ty));
                                 this.consume_by_copy_or_move(place.to_place(this))
+                            }
+                        })
+                        .collect()
+                } else if let Rest::DefaultFields(field_types) = base {
+                    // // `field_names` is an iterator, ok to clone.
+                    // for (n, ty) in iter::zip(field_names.clone(), &**field_types) {
+                    //     if let None = fields_map.get(&n)
+                    //         && let None = variant.fields[n].value
+                    //     {
+                    //         this.tcx
+                    //             .dcx()
+                    //             .struct_span_err(expr_span, format!("asdf {n:?} {ty}"))
+                    //             .emit();
+                    //         return block.unit();
+                    //     }
+                    // }
+                    iter::zip(field_names, &**field_types)
+                        .map(|(n, ty)| match fields_map.get(&n) {
+                            Some(v) => v.clone(),
+                            None => {
+                                match variant.fields[n].value {
+                                    Some(value) => this.literal_operand(
+                                        expr_span,
+                                        Const::from_ty_const(value, *ty, this.tcx)
+                                            .normalize(this.tcx, this.param_env),
+                                    ),
+                                    None => {
+                                        let name = variant.fields[n].name;
+                                        this.tcx
+                                            .dcx()
+                                            .struct_span_err(
+                                                expr_span,
+                                                format!(
+                                                    "missing mandatory field `{name}` of type \
+                                                     `{ty}`",
+                                                ),
+                                            )
+                                            .emit();
+                                        // FIXME: uncomment the prior check and fall-back in a more
+                                        // graceful manner.
+                                        let place = this.temp(*ty, expr_span);
+                                        this.consume_by_copy_or_move(place)
+                                    }
+                                }
                             }
                         })
                         .collect()

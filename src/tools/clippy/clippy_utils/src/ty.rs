@@ -948,7 +948,7 @@ impl AdtVariantInfo {
 }
 
 /// Gets the struct or enum variant from the given `Res`
-pub fn adt_and_variant_of_res<'tcx>(cx: &LateContext<'tcx>, res: Res) -> Option<(AdtDef<'tcx>, &'tcx VariantDef)> {
+pub fn adt_and_variant_of_res<'tcx>(cx: &LateContext<'tcx>, res: Res) -> Option<(AdtDef<'tcx>, &'tcx VariantDef<'tcx>)> {
     match res {
         Res::Def(DefKind::Struct, id) => {
             let adt = cx.tcx.adt_def(id);

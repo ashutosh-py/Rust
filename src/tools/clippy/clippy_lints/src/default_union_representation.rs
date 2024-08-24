@@ -87,7 +87,7 @@ fn is_union_with_two_non_zst_fields<'tcx>(cx: &LateContext<'tcx>, item: &Item<'t
     }
 }
 
-fn is_zst<'tcx>(cx: &LateContext<'tcx>, field: &FieldDef, args: ty::GenericArgsRef<'tcx>) -> bool {
+fn is_zst<'tcx>(cx: &LateContext<'tcx>, field: &FieldDef<'tcx>, args: ty::GenericArgsRef<'tcx>) -> bool {
     let ty = field.ty(cx.tcx, args);
     if let Ok(layout) = cx.layout_of(ty) {
         layout.is_zst()

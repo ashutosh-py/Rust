@@ -73,7 +73,20 @@ fn default_struct_substructure(
         Named(fields) => {
             let default_fields = fields
                 .iter()
-                .map(|&(ident, span)| cx.field_imm(span, ident, default_call(span)))
+                .map(|(ident, span, default_val)| {
+                    cx.field_imm(
+                        *span,
+                        *ident,
+                        match default_val {
+                            // We use `Default::default()`.
+                            None => default_call(*span),
+                            // We use the field default const expression.
+                            Some(val) => {
+                                cx.expr(val.value.span, ast::ExprKind::ConstBlock(val.clone()))
+                            }
+                        },
+                    )
+                })
                 .collect();
             cx.expr_struct_ident(trait_span, substr.type_ident, default_fields)
         }

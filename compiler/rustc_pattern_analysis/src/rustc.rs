@@ -172,8 +172,8 @@ impl<'p, 'tcx: 'p> RustcPatCtxt<'p, 'tcx> {
     pub(crate) fn variant_sub_tys(
         &self,
         ty: RevealedTy<'tcx>,
-        variant: &'tcx VariantDef,
-    ) -> impl Iterator<Item = (&'tcx FieldDef, RevealedTy<'tcx>)> + Captures<'p> + Captures<'_>
+        variant: &'tcx VariantDef<'tcx>,
+    ) -> impl Iterator<Item = (&'tcx FieldDef<'tcx>, RevealedTy<'tcx>)> + Captures<'p> + Captures<'_>
     {
         let ty::Adt(_, args) = ty.kind() else { bug!() };
         variant.fields.iter().map(move |field| {

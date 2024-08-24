@@ -2463,7 +2463,7 @@ impl<'tcx> LateLintPass<'tcx> for InvalidValue {
         fn variant_find_init_error<'tcx>(
             cx: &LateContext<'tcx>,
             ty: Ty<'tcx>,
-            variant: &VariantDef,
+            variant: &VariantDef<'tcx>,
             args: ty::GenericArgsRef<'tcx>,
             descr: &str,
             init: InitKind,

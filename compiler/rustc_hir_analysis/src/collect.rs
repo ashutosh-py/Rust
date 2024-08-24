@@ -1081,16 +1081,16 @@ impl<'tcx> FieldUniquenessCheckContext<'tcx> {
     }
 }
 
-fn lower_variant(
-    tcx: TyCtxt<'_>,
+fn lower_variant<'tcx>(
+    tcx: TyCtxt<'tcx>,
     variant_did: Option<LocalDefId>,
     ident: Ident,
     discr: ty::VariantDiscr,
-    def: &hir::VariantData<'_>,
+    def: &hir::VariantData<'tcx>,
     adt_kind: ty::AdtKind,
     parent_did: LocalDefId,
     is_anonymous: bool,
-) -> ty::VariantDef {
+) -> ty::VariantDef<'tcx> {
     let mut has_unnamed_fields = false;
     let mut field_uniqueness_check_ctx = FieldUniquenessCheckContext::new(tcx);
     let fields = def
@@ -1108,6 +1108,7 @@ fn lower_variant(
             did: f.def_id.to_def_id(),
             name: f.ident.name,
             vis: tcx.visibility(f.def_id),
+            value: f.value.map(|v| Const::from_anon_const(tcx, v.def_id)),
         })
         .collect();
     let recovered = match def {

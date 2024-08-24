@@ -245,7 +245,7 @@ impl RustcInternal for VariantIdx {
 }
 
 impl RustcInternal for VariantDef {
-    type T<'tcx> = &'tcx rustc_ty::VariantDef;
+    type T<'tcx> = &'tcx rustc_ty::VariantDef<'tcx>;
 
     fn internal<'tcx>(&self, tables: &mut Tables<'_>, tcx: TyCtxt<'tcx>) -> Self::T<'tcx> {
         self.adt_def.internal(tables, tcx).variant(self.idx.internal(tables, tcx))
