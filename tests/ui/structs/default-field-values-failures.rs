@@ -19,7 +19,6 @@ fn main () {
     let _ = Foo { .. }; // ok
     let _ = Foo::default(); // silenced
     let _ = Bar { .. }; //~ ERROR mandatory field
-    //~^ ERROR used binding isn't initialized
     let _ = Bar::default(); // silenced
     let _ = Bar { bar: S, .. }; // ok
 }

@@ -1787,6 +1787,20 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         }
 
         if let hir::Rest::DefaultFields(span) = *base_expr {
+            for f in &variant.fields {
+                let ident = self.tcx.adjust_ident(f.ident(self.tcx), variant.def_id);
+                if let Some(_) = remaining_fields.remove(&ident)
+                    && f.value.is_none()
+                    && self.tcx.features().default_field_values
+                {
+                    let guar = self
+                        .dcx()
+                        .struct_span_err(span, format!("missing mandatory field `{ident}`"))
+                        .emit();
+                    self.set_tainted_by_errors(guar);
+                    return;
+                }
+            }
             let fru_tys = match adt_ty.kind() {
                 ty::Adt(adt, args) if adt.is_struct() => variant
                     .fields

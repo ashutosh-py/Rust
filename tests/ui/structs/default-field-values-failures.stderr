@@ -14,22 +14,12 @@ LL + #[derive(Default)]
 LL | pub struct S;
    |
 
-error: missing mandatory field `bar` of type `S`
-  --> $DIR/default-field-values-failures.rs:21:13
+error: missing mandatory field `bar`
+  --> $DIR/default-field-values-failures.rs:21:21
    |
 LL |     let _ = Bar { .. };
-   |             ^^^^^^^^^^
+   |                     ^
 
-error[E0381]: used binding isn't initialized
-  --> $DIR/default-field-values-failures.rs:21:13
-   |
-LL |     let _ = Bar { .. };
-   |             ^^^^^^^^^^
-   |             |
-   |             value used here but it isn't initialized
-   |             binding declared here but left uninitialized
+error: aborting due to 2 previous errors
 
-error: aborting due to 3 previous errors
-
-Some errors have detailed explanations: E0277, E0381.
-For more information about an error, try `rustc --explain E0277`.
+For more information about this error, try `rustc --explain E0277`.
