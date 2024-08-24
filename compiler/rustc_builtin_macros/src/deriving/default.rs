@@ -76,18 +76,15 @@ fn default_struct_substructure(
             let default_fields = fields
                 .iter()
                 .map(|(ident, span, default_val)| {
-                    cx.field_imm(
-                        *span,
-                        *ident,
-                        match default_val {
-                            // We use `Default::default()`.
-                            None => default_call(cx, *span),
-                            // We use the field default const expression.
-                            Some(val) => {
-                                cx.expr(val.value.span, ast::ExprKind::ConstBlock(val.clone()))
-                            }
-                        },
-                    )
+                    let value = match default_val {
+                        // We use `Default::default()`.
+                        None => default_call(cx, *span),
+                        // We use the field default const expression.
+                        Some(val) => {
+                            cx.expr(val.value.span, ast::ExprKind::ConstBlock(val.clone()))
+                        }
+                    };
+                    cx.field_imm(*span, *ident, value)
                 })
                 .collect();
             cx.expr_struct_ident(trait_span, substr.type_ident, default_fields)
@@ -122,7 +119,7 @@ fn default_enum_substructure(
                             cx.field_imm(
                                 field.span,
                                 field.ident.unwrap(),
-                                match &field.value {
+                                match &field.default {
                                     // We use `Default::default()`.
                                     None => default_call(cx, field.span),
                                     // We use the field default const expression.
@@ -209,7 +206,7 @@ fn extract_default_variant<'a>(
 
     if cx.ecfg.features.default_field_values
         && let VariantData::Struct { fields, .. } = &variant.data
-        && fields.iter().all(|f| f.value.is_some())
+        && fields.iter().all(|f| f.default.is_some())
     {
         // Allowed
     } else if !matches!(variant.data, VariantData::Unit(..)) {

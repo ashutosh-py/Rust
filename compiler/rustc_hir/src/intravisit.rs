@@ -1199,7 +1199,7 @@ pub fn walk_struct_def<'v, V: Visitor<'v>>(
 pub fn walk_field_def<'v, V: Visitor<'v>>(visitor: &mut V, field: &'v FieldDef<'v>) -> V::Result {
     try_visit!(visitor.visit_id(field.hir_id));
     try_visit!(visitor.visit_ident(field.ident));
-    visit_opt!(visitor, visit_anon_const, &field.value);
+    visit_opt!(visitor, visit_anon_const, &field.default);
     visitor.visit_ty(field.ty)
 }
 

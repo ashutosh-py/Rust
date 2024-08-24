@@ -124,7 +124,7 @@ fn anon_const_type_of<'tcx>(tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> Ty<'tcx> {
             return ty;
         }
 
-        Node::Field(&hir::FieldDef { value: Some(_), ty, .. }) => {
+        Node::Field(&hir::FieldDef { default: Some(_), ty, .. }) => {
             ItemCtxt::new(tcx, def_id).lower_ty(ty)
         }
 

@@ -173,7 +173,7 @@ pub(crate) fn placeholder(
             ty: ty(),
             vis,
             is_placeholder: true,
-            value: None,
+            default: None,
         }]),
         AstFragmentKind::Variants => AstFragment::Variants(smallvec![ast::Variant {
             attrs: Default::default(),

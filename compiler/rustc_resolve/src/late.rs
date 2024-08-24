@@ -1314,12 +1314,12 @@ impl<'a: 'ast, 'ast, 'tcx> Visitor<'ast> for LateResolutionVisitor<'a, '_, 'ast,
 
     fn visit_field_def(&mut self, f: &'ast FieldDef) {
         self.resolve_doc_links(&f.attrs, MaybeExported::Ok(f.id));
-        let FieldDef { attrs, id: _, span: _, vis, ident, ty, is_placeholder: _, value } = f;
+        let FieldDef { attrs, id: _, span: _, vis, ident, ty, is_placeholder: _, default } = f;
         walk_list!(self, visit_attribute, attrs);
         try_visit!(self.visit_vis(vis));
         visit_opt!(self, visit_ident, *ident);
         try_visit!(self.visit_ty(ty));
-        if let Some(v) = &value {
+        if let Some(v) = &default {
             self.resolve_anon_const(v, AnonConstKind::InlineConst);
         }
     }
