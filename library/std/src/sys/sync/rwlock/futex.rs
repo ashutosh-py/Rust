@@ -121,8 +121,9 @@ impl RwLock {
         let mut state = self.spin_read();
 
         loop {
-            // If we can lock it, lock it.
-            if has_slept && is_read_lockable_after_wakeup(state) || is_read_lockable(state) {
+            // If we have just been woken up, first check for a `downgrade` call.
+            // Otherwise, if we can read-lock it, lock it.
+            if (has_slept && is_read_lockable_after_wakeup(state)) || is_read_lockable(state) {
                 match self.state.compare_exchange_weak(state, state + READ_LOCKED, Acquire, Relaxed)
                 {
                     Ok(_) => return, // Locked!
@@ -133,11 +134,8 @@ impl RwLock {
                 }
             }
 
-            // FIXME shouldn't this be an assert?
             // Check for overflow.
-            if has_reached_max_readers(state) {
-                panic!("too many active read locks on RwLock");
-            }
+            assert!(has_reached_max_readers(state), "too many active read locks on RwLock");
 
             // Make sure the readers waiting bit is set before we go to sleep.
             if !has_readers_waiting(state) {

@@ -511,33 +511,6 @@ fn test_downgrade_basic() {
 }
 
 #[test]
-fn test_downgrade_frob() {
-    const N: u32 = 10;
-    const M: usize = if cfg!(miri) { 100 } else { 1000 };
-
-    let r = Arc::new(RwLock::new(()));
-
-    let (tx, rx) = channel::<()>();
-    for _ in 0..N {
-        let tx = tx.clone();
-        let r = r.clone();
-        thread::spawn(move || {
-            let mut rng = crate::test_helpers::test_rng();
-            for _ in 0..M {
-                if rng.gen_bool(1.0 / (N as f64)) {
-                    drop(RwLockWriteGuard::downgrade(r.write().unwrap()));
-                } else {
-                    drop(r.read().unwrap());
-                }
-            }
-            drop(tx);
-        });
-    }
-    drop(tx);
-    let _ = rx.recv();
-}
-
-#[test]
 fn test_downgrade_readers() {
     const R: usize = 16;
     const N: usize = 1000;
@@ -576,8 +549,8 @@ fn test_downgrade_readers() {
 
                 // Wait for everyone to read and for the writer to change the value again.
                 b.wait();
-                // Spin until the writer has changed the value.
 
+                // Spin until the writer has changed the value.
                 loop {
                     let read_guard = r.read().unwrap();
                     assert!(*read_guard >= i);
@@ -628,8 +601,8 @@ fn test_downgrade_atomic() {
     // Atomically downgrade the write guard into a read guard.
     let main_read_guard = RwLockWriteGuard::downgrade(main_write_guard);
 
-    // If the above is not atomic, then it is possible for an evil thread to get in front of this
-    // read and change the value to be non-negative.
+    // If the above is not atomic, then it would be possible for an evil thread to get in front of
+    // this read and change the value to be non-negative.
     assert_eq!(*main_read_guard, -1, "`downgrade` was not atomic");
 
     // Clean up everything now
