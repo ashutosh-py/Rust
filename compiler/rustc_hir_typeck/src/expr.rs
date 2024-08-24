@@ -1793,6 +1793,13 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                     .iter()
                     .map(|f| self.normalize(span, f.ty(self.tcx, args)))
                     .collect(),
+                ty::Adt(adt, args) if adt.is_enum() && self.tcx.features().default_field_values => {
+                    variant
+                        .fields
+                        .iter()
+                        .map(|f| self.normalize(span, f.ty(self.tcx, args)))
+                        .collect()
+                }
                 _ => {
                     self.dcx().emit_err(FunctionalRecordUpdateOnNonStruct { span });
                     return;

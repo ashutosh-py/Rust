@@ -1,13 +1,22 @@
 //@ run-pass
 #![feature(default_field_values)]
+#![allow(unused_variables)]
 
-#[derive(Debug)]
 pub struct S;
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct Foo {
     pub bar: S = S,
     pub baz: i32 = 42 + 3,
+}
+
+// #[derive(Default)]
+pub enum Bar {
+    // #[default]
+    Foo {
+        bar: S = S,
+        baz: i32 = 42 + 3,
+    }
 }
 
 fn main () {
@@ -18,4 +27,12 @@ fn main () {
     assert_eq!(45, x.baz);
     assert_eq!(45, y.baz);
     assert_eq!(1, z.baz);
+
+    let x = Bar::Foo { .. };
+    // let y = Bar::default();
+    let z = Bar::Foo { baz: 1, .. };
+
+    assert!(matches!(Bar::Foo { bar: S, baz: 45 }, x));
+    // assert!(matches!(Bar::Foo { bar: S, baz: 45 }, y));
+    assert!(matches!(Bar::Foo { bar: S, baz: 1 }, z));
 }
