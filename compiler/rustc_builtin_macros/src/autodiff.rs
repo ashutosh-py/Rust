@@ -562,7 +562,7 @@ fn gen_enzyme_decl(
                 let old_name = if let PatKind::Ident(_, ident, _) = arg.pat.kind {
                     ident.name
                 } else {
-                    dbg!(&shadow_arg.pat);
+                    trace!("{:#?}", &shadow_arg.pat);
                     panic!("not an ident?");
                 };
                 let name: String = format!("d{}", old_name);
@@ -582,7 +582,7 @@ fn gen_enzyme_decl(
                 let old_name = if let PatKind::Ident(_, ident, _) = arg.pat.kind {
                     ident.name
                 } else {
-                    dbg!(&shadow_arg.pat);
+                    trace!("{:#?}", &shadow_arg.pat);
                     panic!("not an ident?");
                 };
                 let name: String = format!("b{}", old_name);
@@ -601,7 +601,7 @@ fn gen_enzyme_decl(
                 // Nothing to do here.
             }
             _ => {
-                dbg!(&activity);
+                trace!{"{:#?}", &activity};
                 panic!("Not implemented");
             }
         }
