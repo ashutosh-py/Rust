@@ -106,18 +106,10 @@ fn main() {
         // x86 has ABI bugs that show up with optimizations. This should be partially fixed with
         // the compiler-builtins update. <https://github.com/rust-lang/rust/issues/123885>
         ("x86" | "x86_64", _) => false,
-        // Missing `__gnu_h2f_ieee` and `__gnu_f2h_ieee`
-        ("powerpc" | "powerpc64", _) => false,
-        // Missing `__gnu_h2f_ieee` and `__gnu_f2h_ieee`
-        ("mips" | "mips32r6" | "mips64" | "mips64r6", _) => false,
-        // Missing `__extendhfsf` and `__truncsfhf`
-        ("riscv32" | "riscv64", _) => false,
-        // Most OSs are missing `__extendhfsf` and `__truncsfhf`
-        (_, "linux" | "macos") => true,
-        // Almost all OSs besides Linux and MacOS are missing symbols until compiler-builtins can
-        // be updated. <https://github.com/rust-lang/rust/pull/125016> will get some of these, the
-        // next CB update should get the rest.
-        _ => false,
+        // `f16` support only requires that symbols converting to and from `f32` are available. We
+        // provide these in `compiler-builtins`, so `f16` should be available on all platforms that
+        // do not have other ABI issues or LLVM crashes.
+        _ => true,
     };
 
     let has_reliable_f128 = match (target_arch.as_str(), target_os.as_str()) {
