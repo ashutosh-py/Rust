@@ -276,7 +276,6 @@ impl<'tcx, 'body> ParseCtxt<'tcx, 'body> {
                 ))
             },
             ExprKind::Adt(box AdtExpr { adt_def, variant_index, args, fields, .. }) => {
-                // HERE?
                 let is_union = adt_def.is_union();
                 let active_field_index = is_union.then(|| fields[0].name);
 
