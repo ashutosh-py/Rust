@@ -371,7 +371,12 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                             Some(v) => v.clone(),
                             None => match variant.fields[n].value {
                                 Some(def) => {
-                                    let ty = this.tcx.type_of(def).skip_binder();
+                                    let ty = this.tcx.type_of(def);
+                                    let ty = this.tcx.instantiate_and_normalize_erasing_regions(
+                                        args,
+                                        this.param_env,
+                                        ty,
+                                    );
                                     let value = Const::Unevaluated(
                                         UnevaluatedConst { def, args, promoted: None },
                                         ty,

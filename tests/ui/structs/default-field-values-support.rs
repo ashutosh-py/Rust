@@ -20,14 +20,15 @@ pub enum Bar {
 }
 
 #[derive(Default)]
-pub struct Qux<const C: i32> {
-    bar: S = Qux::<C>::S,
+pub struct Qux<A, const C: i32> {
+    bar: S = Qux::<A, C>::S,
     baz: i32 = foo(),
-    bat: i32 = <Qux<C> as T>::K,
+    bat: i32 = <Qux<A, C> as T>::K,
     bay: i32 = C,
+    bak: Vec<A> = Vec::new(),
 }
 
-impl<const C: i32> Qux<C> {
+impl<A, const C: i32> Qux<A, C> {
     const S: S = S;
 }
 
@@ -35,7 +36,7 @@ trait T {
     const K: i32;
 }
 
-impl<const C: i32> T for Qux<C> {
+impl<A, const C: i32> T for Qux<A, C> {
     const K: i32 = 2;
 }
 
@@ -60,6 +61,7 @@ fn main () {
     assert!(matches!(Bar::Foo { bar: S, baz: 45 }, y));
     assert!(matches!(Bar::Foo { bar: S, baz: 1 }, z));
 
-    let x = Qux::<4> { .. };
-    assert!(matches!(Qux::<4> { bar: S, baz: 42, bat: 2, bay: 4 }, x));
+    let x = Qux::<i32, 4> { .. };
+    assert!(matches!(Qux::<i32, 4> { bar: S, baz: 42, bat: 2, bay: 4, .. }, x));
+    assert!(x.bak.is_empty());
 }
