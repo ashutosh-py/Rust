@@ -34,7 +34,8 @@ if isWindows && isKnownToBeMingwBuild; then
 
     mingw_dir="mingw${bits}"
 
-    curl -L -o mingw.7z "https://github.com/niXman/mingw-builds-binaries/releases/download/14.1.0-rt_v12-rev0/${mingw_archive}"
+    url="https://github.com/niXman/mingw-builds-binaries/releases/download/14.1.0-rt_v12-rev0"
+    curl -L -o mingw.7z "${url}/${mingw_archive}"
     7z x -y mingw.7z > /dev/null
     ciCommandAddPath "$(pwd)/${mingw_dir}/bin"
 fi
