@@ -1320,7 +1320,7 @@ impl<'a: 'ast, 'ast, 'tcx> Visitor<'ast> for LateResolutionVisitor<'a, '_, 'ast,
         visit_opt!(self, visit_ident, *ident);
         try_visit!(self.visit_ty(ty));
         if let Some(v) = &default {
-            self.resolve_anon_const(v, AnonConstKind::InlineConst);
+            self.resolve_anon_const(v, AnonConstKind::ConstArg(IsRepeatExpr::No));
         }
     }
 }

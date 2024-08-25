@@ -21,7 +21,7 @@ pub enum Bar {
 
 #[derive(Default)]
 pub struct Qux {
-    bar: S = Self::S,
+    bar: S = Qux::S,
     baz: i32 = foo(),
     bat: i32 = <Qux as T>::K,
 }
