@@ -448,6 +448,7 @@ fn test_from_box_str() {
     use std::string::String;
 
     let s = String::from("foo").into_boxed_str();
+    assert_eq!((&&&s).as_str(), "foo");
     let r: Rc<str> = Rc::from(s);
 
     assert_eq!(&r[..], "foo");

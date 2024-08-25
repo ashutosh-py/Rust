@@ -647,6 +647,15 @@ impl<T, A: Allocator> Box<T, A> {
     }
 }
 
+impl<A: Allocator> Box<str, A> {
+    #[stable(feature = "box_as_str", since = "CURRENT_RUSTC_VERSION")]
+    #[inline]
+    /// Extracts a string slice containing the entire `Box<str>`.
+    pub fn as_str(&self) -> &str {
+        &*self
+    }
+}
+
 impl<T> Box<[T]> {
     /// Constructs a new boxed slice with uninitialized contents.
     ///
