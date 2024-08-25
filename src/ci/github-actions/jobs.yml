@@ -80,8 +80,14 @@ envs:
 # These jobs automatically inherit envs.pr, to avoid repeating
 # it in each job definition.
 pr:
-  - image: mingw-check
-    <<: *job-linux-4c
+  - image: x86_64-mingw
+    env:
+      SCRIPT: make ci-mingw
+      RUST_CONFIGURE_ARGS: --build=x86_64-pc-windows-gnu
+      # We are intentionally allowing an old toolchain on this builder (and that's
+      # incompatible with LLVM downloads today).
+      NO_DOWNLOAD_CI_LLVM: 1
+    <<: *job-windows-8c
   - image: mingw-check-tidy
     continue_on_error: true
     <<: *job-linux-4c
