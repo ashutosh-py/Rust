@@ -1373,9 +1373,8 @@ fn check_enum(tcx: TyCtxt<'_>, def_id: LocalDefId) {
     }
 
     if def.repr().int.is_none() {
-        let is_unit = |var: &ty::VariantDef<'_>| matches!(var.ctor_kind(), Some(CtorKind::Const));
-        let has_disr =
-            |var: &ty::VariantDef<'_>| matches!(var.discr, ty::VariantDiscr::Explicit(_));
+        let is_unit = |var: &ty::VariantDef| matches!(var.ctor_kind(), Some(CtorKind::Const));
+        let has_disr = |var: &ty::VariantDef| matches!(var.discr, ty::VariantDiscr::Explicit(_));
 
         let has_non_units = def.variants().iter().any(|var| !is_unit(var));
         let disr_units = def.variants().iter().any(|var| is_unit(var) && has_disr(var));

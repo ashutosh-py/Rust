@@ -15,7 +15,7 @@ use crate::regions::InferCtxtRegionExt;
 use crate::traits::{self, FulfillmentError, ObligationCause};
 
 pub enum CopyImplementationError<'tcx> {
-    InfringingFields(Vec<(&'tcx ty::FieldDef<'tcx>, Ty<'tcx>, InfringingFieldsReason<'tcx>)>),
+    InfringingFields(Vec<(&'tcx ty::FieldDef, Ty<'tcx>, InfringingFieldsReason<'tcx>)>),
     NotAnAdt,
     HasDestructor,
 }
@@ -23,7 +23,7 @@ pub enum CopyImplementationError<'tcx> {
 pub enum ConstParamTyImplementationError<'tcx> {
     UnsizedConstParamsFeatureRequired,
     InvalidInnerTyOfBuiltinTy(Vec<(Ty<'tcx>, InfringingFieldsReason<'tcx>)>),
-    InfrigingFields(Vec<(&'tcx ty::FieldDef<'tcx>, Ty<'tcx>, InfringingFieldsReason<'tcx>)>),
+    InfrigingFields(Vec<(&'tcx ty::FieldDef, Ty<'tcx>, InfringingFieldsReason<'tcx>)>),
     NotAnAdtOrBuiltinAllowed,
 }
 
@@ -193,7 +193,7 @@ pub fn all_fields_implement_trait<'tcx>(
     args: ty::GenericArgsRef<'tcx>,
     parent_cause: ObligationCause<'tcx>,
     lang_item: LangItem,
-) -> Result<(), Vec<(&'tcx ty::FieldDef<'tcx>, Ty<'tcx>, InfringingFieldsReason<'tcx>)>> {
+) -> Result<(), Vec<(&'tcx ty::FieldDef, Ty<'tcx>, InfringingFieldsReason<'tcx>)>> {
     let trait_def_id = tcx.require_lang_item(lang_item, Some(parent_cause.span));
 
     let mut infringing = Vec::new();

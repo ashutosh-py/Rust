@@ -264,7 +264,7 @@ where
         &self,
         base_place: Place<'tcx>,
         variant_path: D::Path,
-        variant: &'tcx ty::VariantDef<'tcx>,
+        variant: &'tcx ty::VariantDef,
         args: GenericArgsRef<'tcx>,
     ) -> Vec<(Place<'tcx>, Option<D::Path>)> {
         variant

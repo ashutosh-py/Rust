@@ -106,7 +106,7 @@ pub(crate) fn check(cx: &LateContext<'_>, ex: &Expr<'_>, arms: &[Arm<'_>]) {
         });
     }
 
-    let format_suggestion = |variant: &VariantDef<'_>| {
+    let format_suggestion = |variant: &VariantDef| {
         format!(
             "{}{}{}{}",
             if let Some(ident) = wildcard_ident {
@@ -199,6 +199,6 @@ impl<'a> CommonPrefixSearcher<'a> {
     }
 }
 
-fn is_hidden(cx: &LateContext<'_>, variant_def: &VariantDef<'_>) -> bool {
+fn is_hidden(cx: &LateContext<'_>, variant_def: &VariantDef) -> bool {
     cx.tcx.is_doc_hidden(variant_def.def_id) || cx.tcx.has_attr(variant_def.def_id, sym::unstable)
 }

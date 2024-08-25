@@ -264,7 +264,7 @@ fn impl_item_search_pat(item: &ImplItem<'_>) -> (Pat, Pat) {
     }
 }
 
-fn field_def_search_pat(def: &FieldDef<'_>) -> (Pat, Pat) {
+fn field_def_search_pat(def: &FieldDef) -> (Pat, Pat) {
     if def.vis_span.is_empty() {
         if def.is_positional() {
             (Pat::Str(""), Pat::Str(""))
@@ -401,7 +401,7 @@ impl_with_search_pat!((cx: LateContext<'tcx>, self: Expr<'tcx>) => expr_search_p
 impl_with_search_pat!((_cx: LateContext<'tcx>, self: Item<'_>) => item_search_pat(self));
 impl_with_search_pat!((_cx: LateContext<'tcx>, self: TraitItem<'_>) => trait_item_search_pat(self));
 impl_with_search_pat!((_cx: LateContext<'tcx>, self: ImplItem<'_>) => impl_item_search_pat(self));
-impl_with_search_pat!((_cx: LateContext<'tcx>, self: FieldDef<'_>) => field_def_search_pat(self));
+impl_with_search_pat!((_cx: LateContext<'tcx>, self: FieldDef) => field_def_search_pat(self));
 impl_with_search_pat!((_cx: LateContext<'tcx>, self: Variant<'_>) => variant_search_pat(self));
 impl_with_search_pat!((_cx: LateContext<'tcx>, self: Ty<'_>) => ty_search_pat(self));
 impl_with_search_pat!((_cx: LateContext<'tcx>, self: Attribute) => attr_search_pat(self));

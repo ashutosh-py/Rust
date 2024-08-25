@@ -142,7 +142,7 @@ impl<'tcx> Stable<'tcx> for ty::AdtKind {
     }
 }
 
-impl<'tcx> Stable<'tcx> for ty::FieldDef<'tcx> {
+impl<'tcx> Stable<'tcx> for ty::FieldDef {
     type T = stable_mir::ty::FieldDef;
 
     fn stable(&self, tables: &mut Tables<'_>) -> Self::T {

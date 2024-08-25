@@ -569,7 +569,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     pub fn field_ty(
         &self,
         span: Span,
-        field: &'tcx ty::FieldDef<'tcx>,
+        field: &'tcx ty::FieldDef,
         args: GenericArgsRef<'tcx>,
     ) -> Ty<'tcx> {
         self.normalize(span, field.ty(self.tcx, args))

@@ -73,7 +73,7 @@ fn inhabited_predicate_adt(tcx: TyCtxt<'_>, def_id: DefId) -> InhabitedPredicate
     )
 }
 
-impl<'tcx> VariantDef<'tcx> {
+impl<'tcx> VariantDef {
     /// Calculates the forest of `DefId`s from which this variant is visibly uninhabited.
     pub fn inhabited_predicate(
         &self,

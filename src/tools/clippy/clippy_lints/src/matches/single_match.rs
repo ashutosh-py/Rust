@@ -222,7 +222,7 @@ impl<'a> PatState<'a> {
         adt: AdtDef<'tcx>,
         path: &'tcx QPath<'_>,
         hir_id: HirId,
-    ) -> Option<(&mut Self, &'tcx VariantDef<'tcx>)> {
+    ) -> Option<(&mut Self, &'tcx VariantDef)> {
         let states = match self {
             Self::Wild => return None,
             Self::Other => {

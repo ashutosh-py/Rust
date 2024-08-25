@@ -187,7 +187,7 @@ fn build_enum_variant_struct_type_di_node<'ll, 'tcx>(
     enum_type_and_layout: TyAndLayout<'tcx>,
     enum_type_di_node: &'ll DIType,
     variant_index: VariantIdx,
-    variant_def: &VariantDef<'tcx>,
+    variant_def: &VariantDef,
     variant_layout: TyAndLayout<'tcx>,
     di_flags: DIFlags,
 ) -> &'ll DIType {

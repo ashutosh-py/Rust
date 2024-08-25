@@ -1002,8 +1002,8 @@ pub(crate) fn nonnull_optimization_guaranteed<'tcx>(
 /// field.
 pub fn transparent_newtype_field<'a, 'tcx>(
     tcx: TyCtxt<'tcx>,
-    variant: &'a ty::VariantDef<'tcx>,
-) -> Option<&'a ty::FieldDef<'tcx>> {
+    variant: &'a ty::VariantDef,
+) -> Option<&'a ty::FieldDef> {
     let param_env = tcx.param_env(variant.def_id);
     variant.fields.iter().find(|field| {
         let field_ty = tcx.type_of(field.did).instantiate_identity();
@@ -1214,7 +1214,7 @@ impl<'a, 'tcx> ImproperCTypesVisitor<'a, 'tcx> {
     fn check_field_type_for_ffi(
         &self,
         cache: &mut FxHashSet<Ty<'tcx>>,
-        field: &ty::FieldDef<'tcx>,
+        field: &ty::FieldDef,
         args: GenericArgsRef<'tcx>,
     ) -> FfiResult<'tcx> {
         let field_ty = field.ty(self.cx.tcx, args);
@@ -1232,7 +1232,7 @@ impl<'a, 'tcx> ImproperCTypesVisitor<'a, 'tcx> {
         cache: &mut FxHashSet<Ty<'tcx>>,
         ty: Ty<'tcx>,
         def: ty::AdtDef<'tcx>,
-        variant: &ty::VariantDef<'tcx>,
+        variant: &ty::VariantDef,
         args: GenericArgsRef<'tcx>,
     ) -> FfiResult<'tcx> {
         use FfiResult::*;

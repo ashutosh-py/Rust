@@ -1560,7 +1560,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         &self,
         qpath: &'tcx QPath<'tcx>,
         hir_id: HirId,
-    ) -> Result<(&'tcx ty::VariantDef<'tcx>, Ty<'tcx>), ErrorGuaranteed> {
+    ) -> Result<(&'tcx ty::VariantDef, Ty<'tcx>), ErrorGuaranteed> {
         let path_span = qpath.span();
         let (def, ty) = self.finish_resolving_struct_path(qpath, path_span, hir_id);
         let variant = match def {

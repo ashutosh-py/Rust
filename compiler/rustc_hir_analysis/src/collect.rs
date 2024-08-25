@@ -1090,7 +1090,7 @@ fn lower_variant<'tcx>(
     adt_kind: ty::AdtKind,
     parent_did: LocalDefId,
     is_anonymous: bool,
-) -> ty::VariantDef<'tcx> {
+) -> ty::VariantDef {
     let mut has_unnamed_fields = false;
     let mut field_uniqueness_check_ctx = FieldUniquenessCheckContext::new(tcx);
     let fields = def
@@ -1108,7 +1108,7 @@ fn lower_variant<'tcx>(
             did: f.def_id.to_def_id(),
             name: f.ident.name,
             vis: tcx.visibility(f.def_id),
-            value: f.default.map(|v| Const::from_anon_const(tcx, v.def_id)),
+            value: f.default.map(|v| v.def_id.to_def_id()),
         })
         .collect();
     let recovered = match def {

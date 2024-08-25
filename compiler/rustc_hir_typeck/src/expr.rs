@@ -1658,7 +1658,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         expected: Expectation<'tcx>,
         expr: &hir::Expr<'_>,
         span: Span,
-        variant: &'tcx ty::VariantDef<'tcx>,
+        variant: &'tcx ty::VariantDef,
         hir_fields: &'tcx [hir::ExprField<'tcx>],
         base_expr: &'tcx hir::Rest<'tcx>,
     ) {
@@ -1928,7 +1928,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             self.typeck_results.borrow_mut().fru_field_types_mut().insert(expr.hir_id, fru_tys);
         } else if adt_kind != AdtKind::Union && !remaining_fields.is_empty() {
             debug!(?remaining_fields);
-            let private_fields: Vec<&ty::FieldDef<'_>> = variant
+            let private_fields: Vec<&ty::FieldDef> = variant
                 .fields
                 .iter()
                 .filter(|field| !field.vis.is_accessible_from(tcx.parent_module(expr.hir_id), tcx))
@@ -1977,8 +1977,8 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         &self,
         adt_ty: Ty<'tcx>,
         span: Span,
-        remaining_fields: UnordMap<Ident, (FieldIdx, &ty::FieldDef<'tcx>)>,
-        variant: &'tcx ty::VariantDef<'tcx>,
+        remaining_fields: UnordMap<Ident, (FieldIdx, &ty::FieldDef)>,
+        variant: &'tcx ty::VariantDef,
         hir_fields: &'tcx [hir::ExprField<'tcx>],
         args: GenericArgsRef<'tcx>,
     ) {
@@ -2028,7 +2028,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     fn suggest_fru_from_range_and_emit(
         &self,
         last_expr_field: &hir::ExprField<'tcx>,
-        variant: &ty::VariantDef<'tcx>,
+        variant: &ty::VariantDef,
         args: GenericArgsRef<'tcx>,
         mut err: Diag<'_>,
     ) {
@@ -2091,7 +2091,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         adt_ty: Ty<'tcx>,
         span: Span,
         expr_span: Span,
-        private_fields: Vec<&ty::FieldDef<'tcx>>,
+        private_fields: Vec<&ty::FieldDef>,
         used_fields: &'tcx [hir::ExprField<'tcx>],
     ) {
         let mut err =
@@ -2215,7 +2215,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     fn report_unknown_field(
         &self,
         ty: Ty<'tcx>,
-        variant: &'tcx ty::VariantDef<'tcx>,
+        variant: &'tcx ty::VariantDef,
         expr: &hir::Expr<'_>,
         field: &hir::ExprField<'_>,
         skip_fields: &[hir::ExprField<'_>],
@@ -2352,7 +2352,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
     fn available_field_names(
         &self,
-        variant: &'tcx ty::VariantDef<'tcx>,
+        variant: &'tcx ty::VariantDef,
         expr: &hir::Expr<'_>,
         skip_fields: &[hir::ExprField<'_>],
     ) -> Vec<Symbol> {
@@ -2385,7 +2385,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         &self,
         base_def: ty::AdtDef<'tcx>,
         ident: Ident,
-        nested_fields: &mut SmallVec<[(FieldIdx, &'tcx ty::FieldDef<'tcx>); 1]>,
+        nested_fields: &mut SmallVec<[(FieldIdx, &'tcx ty::FieldDef); 1]>,
     ) -> bool {
         // No way to find a field in an enum.
         if base_def.is_enum() {
@@ -2960,7 +2960,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         base_ty: Ty<'tcx>,
         mod_id: DefId,
         hir_id: HirId,
-    ) -> Vec<(Vec<&'tcx ty::FieldDef<'tcx>>, GenericArgsRef<'tcx>)> {
+    ) -> Vec<(Vec<&'tcx ty::FieldDef>, GenericArgsRef<'tcx>)> {
         debug!("get_field_candidates(span: {:?}, base_t: {:?}", span, base_ty);
 
         self.autoderef(span, base_ty)
@@ -2999,8 +2999,8 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
     pub(crate) fn check_for_nested_field_satisfying(
         &self,
         span: Span,
-        matches: &impl Fn(&ty::FieldDef<'tcx>, Ty<'tcx>) -> bool,
-        candidate_field: &ty::FieldDef<'tcx>,
+        matches: &impl Fn(&ty::FieldDef, Ty<'tcx>) -> bool,
+        candidate_field: &ty::FieldDef,
         subst: GenericArgsRef<'tcx>,
         mut field_path: Vec<Ident>,
         mod_id: DefId,

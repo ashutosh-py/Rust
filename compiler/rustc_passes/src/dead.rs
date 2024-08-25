@@ -938,7 +938,7 @@ enum ReportOn {
 }
 
 impl<'tcx> DeadVisitor<'tcx> {
-    fn should_warn_about_field(&mut self, field: &ty::FieldDef<'tcx>) -> ShouldWarnAboutField {
+    fn should_warn_about_field(&mut self, field: &ty::FieldDef) -> ShouldWarnAboutField {
         if self.live_symbols.contains(&field.did.expect_local()) {
             return ShouldWarnAboutField::No;
         }

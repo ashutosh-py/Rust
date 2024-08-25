@@ -93,18 +93,18 @@ rustc_data_structures::external_bitflags_debug! { AdtFlags }
 /// where `x` here represents the `DefId` of `S.x`. Then, the `DefId`
 /// can be used with [`TyCtxt::type_of()`] to get the type of the field.
 #[derive(TyEncodable, TyDecodable)]
-pub struct AdtDefData<'tcx> {
+pub struct AdtDefData {
     /// The `DefId` of the struct, enum or union item.
     pub did: DefId,
     /// Variants of the ADT. If this is a struct or union, then there will be a single variant.
-    variants: IndexVec<VariantIdx, VariantDef<'tcx>>,
+    variants: IndexVec<VariantIdx, VariantDef>,
     /// Flags of the ADT (e.g., is this a struct? is this non-exhaustive?).
     flags: AdtFlags,
     /// Repr options provided by the user.
     repr: ReprOptions,
 }
 
-impl<'tcx> PartialEq for AdtDefData<'tcx> {
+impl PartialEq for AdtDefData {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         // There should be only one `AdtDefData` for each `def_id`, therefore
@@ -131,25 +131,25 @@ impl<'tcx> PartialEq for AdtDefData<'tcx> {
     }
 }
 
-impl<'tcx> Eq for AdtDefData<'tcx> {}
+impl Eq for AdtDefData {}
 
 /// There should be only one AdtDef for each `did`, therefore
 /// it is fine to implement `Hash` only based on `did`.
-impl<'tcx> Hash for AdtDefData<'tcx> {
+impl Hash for AdtDefData {
     #[inline]
     fn hash<H: Hasher>(&self, s: &mut H) {
         self.did.hash(s)
     }
 }
 
-impl<'a, 'tcx> HashStable<StableHashingContext<'a>> for AdtDefData<'tcx> {
+impl<'a> HashStable<StableHashingContext<'a>> for AdtDefData {
     fn hash_stable(&self, hcx: &mut StableHashingContext<'a>, hasher: &mut StableHasher) {
         thread_local! {
             static CACHE: RefCell<FxHashMap<(usize, HashingControls), Fingerprint>> = Default::default();
         }
 
         let hash: Fingerprint = CACHE.with(|cache| {
-            let addr = self as *const AdtDefData<'_> as usize;
+            let addr = self as *const AdtDefData as usize;
             let hashing_controls = hcx.hashing_controls();
             *cache.borrow_mut().entry((addr, hashing_controls)).or_insert_with(|| {
                 let ty::AdtDefData { did, ref variants, ref flags, ref repr } = *self;
@@ -170,7 +170,7 @@ impl<'a, 'tcx> HashStable<StableHashingContext<'a>> for AdtDefData<'tcx> {
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, HashStable)]
 #[rustc_pass_by_value]
-pub struct AdtDef<'tcx>(pub Interned<'tcx, AdtDefData<'tcx>>);
+pub struct AdtDef<'tcx>(pub Interned<'tcx, AdtDefData>);
 
 impl<'tcx> AdtDef<'tcx> {
     #[inline]
@@ -179,12 +179,12 @@ impl<'tcx> AdtDef<'tcx> {
     }
 
     #[inline]
-    pub fn variants(self) -> &'tcx IndexSlice<VariantIdx, VariantDef<'tcx>> {
+    pub fn variants(self) -> &'tcx IndexSlice<VariantIdx, VariantDef> {
         &self.0.0.variants
     }
 
     #[inline]
-    pub fn variant(self, idx: VariantIdx) -> &'tcx VariantDef<'tcx> {
+    pub fn variant(self, idx: VariantIdx) -> &'tcx VariantDef {
         &self.0.0.variants[idx]
     }
 
@@ -251,13 +251,13 @@ impl Into<DataTypeKind> for AdtKind {
     }
 }
 
-impl<'tcx> AdtDefData<'tcx> {
+impl<'tcx> AdtDefData {
     /// Creates a new `AdtDefData`.
     pub(super) fn new(
         tcx: TyCtxt<'tcx>,
         did: DefId,
         kind: AdtKind,
-        variants: IndexVec<VariantIdx, VariantDef<'tcx>>,
+        variants: IndexVec<VariantIdx, VariantDef>,
         repr: ReprOptions,
         is_anonymous: bool,
     ) -> Self {
@@ -414,7 +414,7 @@ impl<'tcx> AdtDef<'tcx> {
     }
 
     /// Asserts this is a struct or union and returns its unique variant.
-    pub fn non_enum_variant(self) -> &'tcx VariantDef<'tcx> {
+    pub fn non_enum_variant(self) -> &'tcx VariantDef {
         assert!(self.is_struct() || self.is_union());
         self.variant(FIRST_VARIANT)
     }
@@ -427,7 +427,7 @@ impl<'tcx> AdtDef<'tcx> {
     /// Returns an iterator over all fields contained
     /// by this ADT (nested unnamed fields are not expanded).
     #[inline]
-    pub fn all_fields(self) -> impl Iterator<Item = &'tcx FieldDef<'tcx>> + Clone {
+    pub fn all_fields(self) -> impl Iterator<Item = &'tcx FieldDef> + Clone {
         self.variants().iter().flat_map(|v| v.fields.iter())
     }
 
@@ -452,12 +452,12 @@ impl<'tcx> AdtDef<'tcx> {
     }
 
     /// Return a `VariantDef` given a variant id.
-    pub fn variant_with_id(self, vid: DefId) -> &'tcx VariantDef<'tcx> {
+    pub fn variant_with_id(self, vid: DefId) -> &'tcx VariantDef {
         self.variants().iter().find(|v| v.def_id == vid).expect("variant_with_id: unknown variant")
     }
 
     /// Return a `VariantDef` given a constructor id.
-    pub fn variant_with_ctor_id(self, cid: DefId) -> &'tcx VariantDef<'tcx> {
+    pub fn variant_with_ctor_id(self, cid: DefId) -> &'tcx VariantDef {
         self.variants()
             .iter()
             .find(|v| v.ctor_def_id() == Some(cid))
@@ -483,7 +483,7 @@ impl<'tcx> AdtDef<'tcx> {
             .0
     }
 
-    pub fn variant_of_res(self, res: Res) -> &'tcx VariantDef<'tcx> {
+    pub fn variant_of_res(self, res: Res) -> &'tcx VariantDef {
         match res {
             Res::Def(DefKind::Variant, vid) => self.variant_with_id(vid),
             Res::Def(DefKind::Ctor(..), cid) => self.variant_with_ctor_id(cid),

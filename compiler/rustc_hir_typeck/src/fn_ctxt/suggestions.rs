@@ -1934,7 +1934,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
     pub(crate) fn is_field_suggestable(
         &self,
-        field: &ty::FieldDef<'tcx>,
+        field: &ty::FieldDef,
         hir_id: HirId,
         span: Span,
     ) -> bool {

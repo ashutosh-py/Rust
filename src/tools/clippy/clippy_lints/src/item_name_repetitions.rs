@@ -181,7 +181,7 @@ fn have_no_extra_prefix(prefixes: &[&str]) -> bool {
     prefixes.iter().all(|p| p == &"" || p == &"_")
 }
 
-fn check_fields(cx: &LateContext<'_>, threshold: u64, item: &Item<'_>, fields: &[FieldDef<'_>]) {
+fn check_fields(cx: &LateContext<'_>, threshold: u64, item: &Item<'_>, fields: &[FieldDef]) {
     if (fields.len() as u64) < threshold {
         return;
     }
@@ -249,7 +249,7 @@ fn check_fields(cx: &LateContext<'_>, threshold: u64, item: &Item<'_>, fields: &
     }
 }
 
-fn check_struct_name_repetition(cx: &LateContext<'_>, item: &Item<'_>, fields: &[FieldDef<'_>]) {
+fn check_struct_name_repetition(cx: &LateContext<'_>, item: &Item<'_>, fields: &[FieldDef]) {
     let snake_name = to_snake_case(item.ident.name.as_str());
     let item_name_words: Vec<&str> = snake_name.split('_').collect();
     for field in fields {

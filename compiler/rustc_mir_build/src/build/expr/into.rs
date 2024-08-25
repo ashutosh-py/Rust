@@ -370,11 +370,15 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                         .map(|(n, ty)| match fields_map.get(&n) {
                             Some(v) => v.clone(),
                             None => match variant.fields[n].value {
-                                Some(value) => this.literal_operand(
-                                    expr_span,
-                                    Const::from_ty_const(value, *ty, this.tcx)
-                                        .normalize(this.tcx, this.param_env),
-                                ),
+                                Some(def) => {
+                                    let ty = this.tcx.type_of(def).skip_binder();
+                                    let value = Const::Unevaluated(
+                                        UnevaluatedConst { def, args, promoted: None },
+                                        ty,
+                                    );
+                                    let value = value.normalize(this.tcx, this.param_env);
+                                    this.literal_operand(expr_span, value)
+                                }
                                 None => {
                                     let name = variant.fields[n].name;
                                     span_bug!(

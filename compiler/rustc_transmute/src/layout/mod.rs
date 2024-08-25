@@ -109,8 +109,8 @@ pub mod rustc {
     #[derive(Debug, Hash, Eq, PartialEq, Clone, Copy)]
     pub enum Def<'tcx> {
         Adt(ty::AdtDef<'tcx>),
-        Variant(&'tcx ty::VariantDef<'tcx>),
-        Field(&'tcx ty::FieldDef<'tcx>),
+        Variant(&'tcx ty::VariantDef),
+        Field(&'tcx ty::FieldDef),
         Primitive,
     }
 

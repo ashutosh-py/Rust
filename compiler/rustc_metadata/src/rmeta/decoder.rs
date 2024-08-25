@@ -1103,7 +1103,7 @@ impl<'a, 'tcx> CrateMetadataRef<'a> {
         kind: DefKind,
         index: DefIndex,
         parent_did: DefId,
-    ) -> (VariantIdx, ty::VariantDef<'tcx>) {
+    ) -> (VariantIdx, ty::VariantDef) {
         let adt_kind = match kind {
             DefKind::Variant => ty::AdtKind::Enum,
             DefKind::Struct => ty::AdtKind::Struct,

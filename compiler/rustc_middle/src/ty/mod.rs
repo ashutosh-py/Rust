@@ -1163,7 +1163,7 @@ rustc_data_structures::external_bitflags_debug! { VariantFlags }
 
 /// Definition of a variant -- a struct's fields or an enum variant.
 #[derive(Debug, HashStable, TyEncodable, TyDecodable)]
-pub struct VariantDef<'tcx> {
+pub struct VariantDef {
     /// `DefId` that identifies the variant itself.
     /// If this variant belongs to a struct or union, then this is a copy of its `DefId`.
     pub def_id: DefId,
@@ -1175,14 +1175,14 @@ pub struct VariantDef<'tcx> {
     /// Discriminant of this variant.
     pub discr: VariantDiscr,
     /// Fields of this variant.
-    pub fields: IndexVec<FieldIdx, FieldDef<'tcx>>,
+    pub fields: IndexVec<FieldIdx, FieldDef>,
     /// The error guarantees from parser, if any.
     tainted: Option<ErrorGuaranteed>,
     /// Flags of the variant (e.g. is field list non-exhaustive)?
     flags: VariantFlags,
 }
 
-impl<'tcx> VariantDef<'tcx> {
+impl VariantDef {
     /// Creates a new `VariantDef`.
     ///
     /// `variant_did` is the `DefId` that identifies the enum variant (if this `VariantDef`
@@ -1204,7 +1204,7 @@ impl<'tcx> VariantDef<'tcx> {
         variant_did: Option<DefId>,
         ctor: Option<(CtorKind, DefId)>,
         discr: VariantDiscr,
-        fields: IndexVec<FieldIdx, FieldDef<'tcx>>,
+        fields: IndexVec<FieldIdx, FieldDef>,
         adt_kind: AdtKind,
         parent_did: DefId,
         recover_tainted: Option<ErrorGuaranteed>,
@@ -1274,7 +1274,7 @@ impl<'tcx> VariantDef<'tcx> {
     ///
     /// `panic!`s if there are no fields or multiple fields.
     #[inline]
-    pub fn single_field(&self) -> &FieldDef<'tcx> {
+    pub fn single_field(&self) -> &FieldDef {
         assert!(self.fields.len() == 1);
 
         &self.fields[FieldIdx::ZERO]
@@ -1282,7 +1282,7 @@ impl<'tcx> VariantDef<'tcx> {
 
     /// Returns the last field in this variant, if present.
     #[inline]
-    pub fn tail_opt(&self) -> Option<&FieldDef<'tcx>> {
+    pub fn tail_opt(&self) -> Option<&FieldDef> {
         self.fields.raw.last()
     }
 
@@ -1292,12 +1292,12 @@ impl<'tcx> VariantDef<'tcx> {
     ///
     /// Panics, if the variant has no fields.
     #[inline]
-    pub fn tail(&self) -> &FieldDef<'tcx> {
+    pub fn tail(&self) -> &FieldDef {
         self.tail_opt().expect("expected unsized ADT to have a tail field")
     }
 }
 
-impl<'tcx> PartialEq for VariantDef<'tcx> {
+impl PartialEq for VariantDef {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         // There should be only one `VariantDef` for each `def_id`, therefore
@@ -1342,9 +1342,9 @@ impl<'tcx> PartialEq for VariantDef<'tcx> {
     }
 }
 
-impl<'tcx> Eq for VariantDef<'tcx> {}
+impl Eq for VariantDef {}
 
-impl<'tcx> Hash for VariantDef<'tcx> {
+impl Hash for VariantDef {
     #[inline]
     fn hash<H: Hasher>(&self, s: &mut H) {
         // There should be only one `VariantDef` for each `def_id`, therefore
@@ -1373,14 +1373,14 @@ pub enum VariantDiscr {
 }
 
 #[derive(Debug, HashStable, TyEncodable, TyDecodable)]
-pub struct FieldDef<'tcx> {
+pub struct FieldDef {
     pub did: DefId,
     pub name: Symbol,
     pub vis: Visibility<DefId>,
-    pub value: Option<ty::Const<'tcx>>,
+    pub value: Option<DefId>,
 }
 
-impl<'tcx> PartialEq for FieldDef<'tcx> {
+impl PartialEq for FieldDef {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         // There should be only one `FieldDef` for each `did`, therefore it is
@@ -1406,9 +1406,9 @@ impl<'tcx> PartialEq for FieldDef<'tcx> {
     }
 }
 
-impl<'tcx> Eq for FieldDef<'tcx> {}
+impl Eq for FieldDef {}
 
-impl<'tcx> Hash for FieldDef<'tcx> {
+impl Hash for FieldDef {
     #[inline]
     fn hash<H: Hasher>(&self, s: &mut H) {
         // There should be only one `FieldDef` for each `did`, therefore it is
@@ -1424,7 +1424,7 @@ impl<'tcx> Hash for FieldDef<'tcx> {
     }
 }
 
-impl<'tcx> FieldDef<'tcx> {
+impl<'tcx> FieldDef {
     /// Returns the type of this field. The resulting type is not normalized. The `arg` is
     /// typically obtained via the second field of [`TyKind::Adt`].
     pub fn ty(&self, tcx: TyCtxt<'tcx>, arg: GenericArgsRef<'tcx>) -> Ty<'tcx> {
@@ -1646,7 +1646,7 @@ impl<'tcx> TyCtxt<'tcx> {
         }
     }
 
-    pub fn find_field_index(self, ident: Ident, variant: &VariantDef<'tcx>) -> Option<FieldIdx> {
+    pub fn find_field_index(self, ident: Ident, variant: &VariantDef) -> Option<FieldIdx> {
         variant.fields.iter_enumerated().find_map(|(i, field)| {
             self.hygienic_eq(ident, field.ident(self), variant.def_id).then_some(i)
         })
@@ -1710,7 +1710,7 @@ impl<'tcx> TyCtxt<'tcx> {
 
     /// Returns `ty::VariantDef` if `res` refers to a struct,
     /// or variant or their constructors, panics otherwise.
-    pub fn expect_variant_res(self, res: Res) -> &'tcx VariantDef<'tcx> {
+    pub fn expect_variant_res(self, res: Res) -> &'tcx VariantDef {
         match res {
             Res::Def(DefKind::Variant, did) => {
                 let enum_did = self.parent(did);

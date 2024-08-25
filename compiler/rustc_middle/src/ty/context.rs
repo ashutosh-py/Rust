@@ -718,7 +718,7 @@ pub struct CtxtInterners<'tcx> {
     const_allocation: InternedSet<'tcx, Allocation>,
     bound_variable_kinds: InternedSet<'tcx, List<ty::BoundVariableKind>>,
     layout: InternedSet<'tcx, LayoutS<FieldIdx, VariantIdx>>,
-    adt_def: InternedSet<'tcx, AdtDefData<'tcx>>,
+    adt_def: InternedSet<'tcx, AdtDefData>,
     external_constraints: InternedSet<'tcx, ExternalConstraintsData<TyCtxt<'tcx>>>,
     predefined_opaques_in_body: InternedSet<'tcx, PredefinedOpaquesData<TyCtxt<'tcx>>>,
     fields: InternedSet<'tcx, List<FieldIdx>>,
@@ -1413,7 +1413,7 @@ impl<'tcx> TyCtxt<'tcx> {
         self,
         did: DefId,
         kind: AdtKind,
-        variants: IndexVec<VariantIdx, ty::VariantDef<'tcx>>,
+        variants: IndexVec<VariantIdx, ty::VariantDef>,
         repr: ReprOptions,
         is_anonymous: bool,
     ) -> ty::AdtDef<'tcx> {
@@ -2422,7 +2422,7 @@ direct_interners! {
     pat: pub mk_pat(PatternKind<'tcx>): Pattern -> Pattern<'tcx>,
     const_allocation: pub mk_const_alloc(Allocation): ConstAllocation -> ConstAllocation<'tcx>,
     layout: pub mk_layout(LayoutS<FieldIdx, VariantIdx>): Layout -> Layout<'tcx>,
-    adt_def: pub mk_adt_def_from_data(AdtDefData<'tcx>): AdtDef -> AdtDef<'tcx>,
+    adt_def: pub mk_adt_def_from_data(AdtDefData): AdtDef -> AdtDef<'tcx>,
     external_constraints: pub mk_external_constraints(ExternalConstraintsData<TyCtxt<'tcx>>):
         ExternalConstraints -> ExternalConstraints<'tcx>,
     predefined_opaques_in_body: pub mk_predefined_opaques_in_body(PredefinedOpaquesData<TyCtxt<'tcx>>):

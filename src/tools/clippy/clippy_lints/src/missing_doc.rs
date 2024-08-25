@@ -239,7 +239,7 @@ impl<'tcx> LateLintPass<'tcx> for MissingDoc {
         self.prev_span = Some(impl_item.span);
     }
 
-    fn check_field_def(&mut self, cx: &LateContext<'tcx>, sf: &'tcx hir::FieldDef<'_>) {
+    fn check_field_def(&mut self, cx: &LateContext<'tcx>, sf: &'tcx hir::FieldDef) {
         if !sf.is_positional() {
             let attrs = cx.tcx.hir().attrs(sf.hir_id);
             if !is_from_proc_macro(cx, sf) {

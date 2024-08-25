@@ -145,7 +145,7 @@ fn variant_needs_drop<'tcx>(
     tcx: TyCtxt<'tcx>,
     param_env: ParamEnv<'tcx>,
     args: GenericArgsRef<'tcx>,
-    variant: &VariantDef<'tcx>,
+    variant: &VariantDef,
 ) -> bool {
     variant.fields.iter().any(|field| {
         let f_ty = field.ty(tcx, args);

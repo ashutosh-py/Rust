@@ -944,7 +944,7 @@ impl<'tcx> NamePrivacyVisitor<'tcx> {
         use_ctxt: Span,        // syntax context of the field name at the use site
         span: Span,            // span of the field pattern, e.g., `x: 0`
         def: ty::AdtDef<'tcx>, // definition of the struct or enum
-        field: &'tcx ty::FieldDef<'tcx>,
+        field: &'tcx ty::FieldDef,
         in_update_syntax: bool,
     ) {
         if def.is_enum() {
