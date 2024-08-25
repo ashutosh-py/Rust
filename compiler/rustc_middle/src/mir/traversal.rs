@@ -1,5 +1,4 @@
 use super::*;
-use crate::mir::visit::Visitor;
 
 /// Preorder traversal of a graph.
 ///
@@ -233,24 +232,10 @@ pub fn postorder<'a, 'tcx>(
     reverse_postorder(body).rev()
 }
 
-struct UsedLocals(BitSet<Local>);
-
-impl<'tcx> Visitor<'tcx> for UsedLocals {
-    fn visit_local(
-        &mut self,
-        local: Local,
-        _ctx: crate::mir::visit::PlaceContext,
-        _location: Location,
-    ) {
-        self.0.insert(local);
-    }
-}
-
 struct MonoReachablePostorder<'a, 'tcx> {
     basic_blocks: &'a IndexSlice<BasicBlock, BasicBlockData<'tcx>>,
     visited: BitSet<BasicBlock>,
     visit_stack: Vec<(BasicBlock, Successors<'a>)>,
-    locals: UsedLocals,
     tcx: TyCtxt<'tcx>,
     instance: Instance<'tcx>,
 }
@@ -266,7 +251,6 @@ impl<'a, 'tcx> MonoReachablePostorder<'a, 'tcx> {
             basic_blocks,
             visited: BitSet::new_empty(basic_blocks.len()),
             visit_stack: Vec::new(),
-            locals: UsedLocals(BitSet::new_empty(body.local_decls.len())),
             tcx,
             instance,
         };
@@ -281,7 +265,6 @@ impl<'a, 'tcx> MonoReachablePostorder<'a, 'tcx> {
             return;
         }
         let data = &self.basic_blocks[bb];
-        self.locals.visit_basic_block_data(bb, data);
         let successors = data.mono_successors(self.tcx, self.instance);
         self.visit_stack.push((bb, successors));
     }
@@ -307,14 +290,14 @@ pub fn mono_reachable_reverse_postorder<'a, 'tcx>(
     body: &'a Body<'tcx>,
     tcx: TyCtxt<'tcx>,
     instance: Instance<'tcx>,
-) -> (Vec<BasicBlock>, BitSet<Local>) {
+) -> Vec<BasicBlock> {
     let mut iter = MonoReachablePostorder::new(body, tcx, instance);
     let mut items = Vec::with_capacity(body.basic_blocks.len());
     while let Some(block) = iter.next() {
         items.push(block);
     }
     items.reverse();
-    (items, iter.locals.0)
+    items
 }
 
 /// Returns an iterator over all basic blocks reachable from the `START_BLOCK` in no particular
