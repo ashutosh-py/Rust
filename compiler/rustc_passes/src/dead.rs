@@ -121,20 +121,19 @@ impl<'tcx> MarkSymbolVisitor<'tcx> {
             ) => {
                 self.check_def_id(def_id);
             }
-            _ if self.in_pat => {}
             Res::PrimTy(..) | Res::SelfCtor(..) | Res::Local(..) => {}
             Res::Def(DefKind::Ctor(CtorOf::Variant, ..), ctor_def_id) => {
                 let variant_id = self.tcx.parent(ctor_def_id);
                 let enum_id = self.tcx.parent(variant_id);
                 self.check_def_id(enum_id);
-                if !self.ignore_variant_stack.contains(&ctor_def_id) {
+                if !self.in_pat && !self.ignore_variant_stack.contains(&ctor_def_id) {
                     self.check_def_id(variant_id);
                 }
             }
             Res::Def(DefKind::Variant, variant_id) => {
                 let enum_id = self.tcx.parent(variant_id);
                 self.check_def_id(enum_id);
-                if !self.ignore_variant_stack.contains(&variant_id) {
+                if !self.in_pat && !self.ignore_variant_stack.contains(&variant_id) {
                     self.check_def_id(variant_id);
                 }
             }
@@ -239,6 +238,9 @@ impl<'tcx> MarkSymbolVisitor<'tcx> {
         let variant = match self.typeck_results().node_type(lhs.hir_id).kind() {
             ty::Adt(adt, _) => {
                 // mark the adt live if its variant appears as the pattern
+                // considering cases when we have `let T(x) = foo()` and `fn foo<T>() -> T;`
+                // we will lose the liveness info of `T` cause we cannot mark it live when visiting `foo`
+                // related issue: https://github.com/rust-lang/rust/issues/120770
                 self.check_def_id(adt.did());
                 adt.variant_of_res(res)
             }
@@ -263,6 +265,9 @@ impl<'tcx> MarkSymbolVisitor<'tcx> {
         let variant = match self.typeck_results().node_type(lhs.hir_id).kind() {
             ty::Adt(adt, _) => {
                 // mark the adt live if its variant appears as the pattern
+                // considering cases when we have `let T(x) = foo()` and `fn foo<T>() -> T;`
+                // we will lose the liveness info of `T` cause we cannot mark it live when visiting `foo`
+                // related issue: https://github.com/rust-lang/rust/issues/120770
                 self.check_def_id(adt.did());
                 adt.variant_of_res(res)
             }
@@ -505,13 +510,13 @@ impl<'tcx> MarkSymbolVisitor<'tcx> {
     /// and added into the unsolved_items during `create_and_seed_worklist`
     fn item_should_be_checked(&mut self, impl_id: hir::ItemId, local_def_id: LocalDefId) -> bool {
         let trait_def_id = match self.tcx.def_kind(local_def_id) {
-            // for assoc impl items of traits, we concern the corresponding trait items are used or not
+            // assoc impl items of traits are live if the corresponding trait items are live
             DefKind::AssocConst | DefKind::AssocTy | DefKind::AssocFn => self
                 .tcx
                 .associated_item(local_def_id)
                 .trait_item_def_id
                 .and_then(|def_id| def_id.as_local()),
-            // for impl items, we concern the corresonding traits are used or not
+            // impl items are live if the corresonding traits are live
             DefKind::Impl { of_trait: true } => self
                 .tcx
                 .impl_trait_ref(impl_id.owner_id.def_id)
@@ -526,16 +531,11 @@ impl<'tcx> MarkSymbolVisitor<'tcx> {
         }
 
         // we only check the ty is used or not for ADTs defined locally
-        let ty_def_id = adt_def_of_ty(self.tcx.hir().item(impl_id).expect_impl().self_ty).and_then(
-            |(local_def_id, def_kind)| {
-                matches!(def_kind, DefKind::Struct | DefKind::Enum | DefKind::Union)
-                    .then_some(local_def_id)
-            },
-        );
-
         // the impl/impl item is used if the trait/trait item is used and the ty is used
-        if let Some(def_id) = ty_def_id
-            && !self.live_symbols.contains(&def_id)
+        if let Some((local_def_id, def_kind)) =
+            adt_def_of_ty(self.tcx.hir().item(impl_id).expect_impl().self_ty)
+            && matches!(def_kind, DefKind::Struct | DefKind::Enum | DefKind::Union)
+            && !self.live_symbols.contains(&local_def_id)
         {
             return false;
         }
@@ -593,9 +593,11 @@ impl<'tcx> Visitor<'tcx> for MarkSymbolVisitor<'tcx> {
         // check `field: T::Ty`
         // marks assoc types live whether the field is not used or not
         // there are three situations:
-        // 1. the field is used, it's good
-        // 2. the field is not used but marked like `#[allow(dead_code)]`,
-        //    it's annoying to mark the assoc type `#[allow(dead_code)]` again
+        // 1. the field is used in exprs, it's good
+        // 2. the field is not used in exprs but marked live due to `#[allow(dead_code)]`,
+        //    we cannot mark the assoc type live because we don't have such an expr and expr_ty refs to it,
+        //    but it's annoying to mark the assoc type `#[allow(dead_code)]` again,
+        //    so we mark the assoc type directlly when we visit the field here
         // 3. the field is not used, and will be linted
         //    the assoc type will be linted after removing the unused field
         self.visit_middle_ty_by_def_id(s.def_id);
@@ -658,9 +660,6 @@ impl<'tcx> Visitor<'tcx> for MarkSymbolVisitor<'tcx> {
                 self.handle_field_pattern_match(pat, res, fields);
             }
             PatKind::Path(ref qpath) => {
-                if let ty::Adt(adt, _) = self.typeck_results().node_type(pat.hir_id).kind() {
-                    self.check_def_id(adt.did());
-                }
                 let res = self.typeck_results().qpath_res(qpath, pat.hir_id);
                 self.handle_res(res);
             }
