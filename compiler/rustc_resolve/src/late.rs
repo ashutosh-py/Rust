@@ -772,6 +772,7 @@ impl<'a: 'ast, 'ast, 'tcx> Visitor<'ast> for LateResolutionVisitor<'a, '_, 'ast,
             TyKind::Path(qself, path) => {
                 self.diag_metadata.current_type_path = Some(ty);
 
+                // TODO:
                 let source = if let Some(seg) = path.segments.last()
                     && let Some(args) = &seg.args
                     && matches!(**args, GenericArgs::ParenthesizedElided(..))
