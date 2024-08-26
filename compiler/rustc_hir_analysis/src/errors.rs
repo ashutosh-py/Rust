@@ -780,14 +780,15 @@ pub(crate) struct PlaceholderNotAllowedItemSignatures {
 
 #[derive(Diagnostic)]
 #[diag(hir_analysis_associated_type_trait_uninferred_generic_params, code = E0212)]
-pub(crate) struct AssociatedTypeTraitUninferredGenericParams {
+pub(crate) struct AssociatedItemTraitUninferredGenericParams {
     #[primary_span]
     pub span: Span,
     #[suggestion(style = "verbose", applicability = "maybe-incorrect", code = "{bound}")]
     pub inferred_sugg: Option<Span>,
     pub bound: String,
     #[subdiagnostic]
-    pub mpart_sugg: Option<AssociatedTypeTraitUninferredGenericParamsMultipartSuggestion>,
+    pub mpart_sugg: Option<AssociatedItemTraitUninferredGenericParamsMultipartSuggestion>,
+    pub what: &'static str,
 }
 
 #[derive(Subdiagnostic)]
@@ -795,7 +796,7 @@ pub(crate) struct AssociatedTypeTraitUninferredGenericParams {
     hir_analysis_associated_type_trait_uninferred_generic_params_multipart_suggestion,
     applicability = "maybe-incorrect"
 )]
-pub(crate) struct AssociatedTypeTraitUninferredGenericParamsMultipartSuggestion {
+pub(crate) struct AssociatedItemTraitUninferredGenericParamsMultipartSuggestion {
     #[suggestion_part(code = "{first}")]
     pub fspan: Span,
     pub first: String,
@@ -1741,6 +1742,13 @@ pub struct CmseCallOutputStackSpill {
 #[derive(Diagnostic)]
 #[diag(hir_analysis_cmse_call_generic, code = E0798)]
 pub struct CmseCallGeneric {
+    #[primary_span]
+    pub span: Span,
+}
+
+#[derive(Diagnostic)]
+#[diag(hir_analysis_bad_return_type_notation_position)]
+pub struct BadReturnTypeNotation {
     #[primary_span]
     pub span: Span,
 }

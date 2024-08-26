@@ -481,15 +481,27 @@ pub fn lower_to_hir(tcx: TyCtxt<'_>, (): ()) -> hir::Crate<'_> {
 enum ParamMode {
     /// Any path in a type context.
     Explicit,
-    /// Path in a type definition, where the anonymous lifetime `'_` is not allowed.
-    ExplicitNamed,
     /// The `module::Type` in `module::Type::method` in an expression.
     Optional,
 }
 
-enum ParenthesizedGenericArgs {
+#[derive(Copy, Clone, Debug)]
+enum AllowReturnTypeNotation {
+    /// Only in types, since RTN is denied later during HIR lowering.
+    Yes,
+    /// All other positions (path expr, method, use tree).
+    No,
+}
+
+enum GenericArgsMode {
+    /// Allow paren sugar, don't allow RTN.
     ParenSugar,
+    /// Allow RTN, don't allow paren sugar.
+    ReturnTypeNotation,
+    // Error if parenthesized generics or RTN are encountered.
     Err,
+    /// Silence errors when lowering generics. Only used with `Res::Err`.
+    Silence,
 }
 
 impl<'a, 'hir> LoweringContext<'a, 'hir> {
@@ -1228,7 +1240,15 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         }
 
         let id = self.lower_node_id(t.id);
-        let qpath = self.lower_qpath(t.id, qself, path, param_mode, itctx, None);
+        let qpath = self.lower_qpath(
+            t.id,
+            qself,
+            path,
+            param_mode,
+            AllowReturnTypeNotation::Yes,
+            itctx,
+            None,
+        );
         self.ty_path(id, t.span, qpath)
     }
 
@@ -2226,6 +2246,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
             &None,
             &p.path,
             ParamMode::Explicit,
+            AllowReturnTypeNotation::No,
             itctx,
             Some(modifiers),
         ) {
@@ -2364,6 +2385,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                     &None,
                     path,
                     ParamMode::Optional,
+                    AllowReturnTypeNotation::No,
                     ImplTraitContext::Disallowed(ImplTraitPosition::Path),
                     None,
                 );
@@ -2443,6 +2465,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                 qself,
                 path,
                 ParamMode::Optional,
+                AllowReturnTypeNotation::No,
                 ImplTraitContext::Disallowed(ImplTraitPosition::Path),
                 None,
             );

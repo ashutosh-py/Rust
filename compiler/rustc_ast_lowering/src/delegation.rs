@@ -51,8 +51,8 @@ use rustc_span::Span;
 use rustc_target::spec::abi;
 use {rustc_ast as ast, rustc_hir as hir};
 
-use super::{ImplTraitContext, LoweringContext, ParamMode, ParenthesizedGenericArgs};
-use crate::{ImplTraitPosition, ResolverAstLoweringExt};
+use super::{GenericArgsMode, ImplTraitContext, LoweringContext, ParamMode};
+use crate::{AllowReturnTypeNotation, ImplTraitPosition, ResolverAstLoweringExt};
 
 pub(crate) struct DelegationResults<'hir> {
     pub body_id: hir::BodyId,
@@ -323,7 +323,7 @@ impl<'hir> LoweringContext<'_, 'hir> {
                 delegation.path.span,
                 ast_segment,
                 ParamMode::Optional,
-                ParenthesizedGenericArgs::Err,
+                GenericArgsMode::Err,
                 ImplTraitContext::Disallowed(ImplTraitPosition::Path),
                 None,
             );
@@ -340,6 +340,7 @@ impl<'hir> LoweringContext<'_, 'hir> {
                 &delegation.qself,
                 &delegation.path,
                 ParamMode::Optional,
+                AllowReturnTypeNotation::No,
                 ImplTraitContext::Disallowed(ImplTraitPosition::Path),
                 None,
             );

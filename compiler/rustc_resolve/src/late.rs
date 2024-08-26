@@ -402,6 +402,8 @@ pub(crate) enum PathSource<'a> {
     TraitItem(Namespace),
     // Paths in delegation item
     Delegation,
+    // Paths that end with `(..)`, for return type notation.
+    ReturnTypeNotation,
 }
 
 impl<'a> PathSource<'a> {
@@ -411,7 +413,8 @@ impl<'a> PathSource<'a> {
             PathSource::Expr(..)
             | PathSource::Pat
             | PathSource::TupleStruct(..)
-            | PathSource::Delegation => ValueNS,
+            | PathSource::Delegation
+            | PathSource::ReturnTypeNotation => ValueNS,
             PathSource::TraitItem(ns) => ns,
         }
     }
@@ -422,7 +425,8 @@ impl<'a> PathSource<'a> {
             | PathSource::Expr(..)
             | PathSource::Pat
             | PathSource::Struct
-            | PathSource::TupleStruct(..) => true,
+            | PathSource::TupleStruct(..)
+            | PathSource::ReturnTypeNotation => true,
             PathSource::Trait(_) | PathSource::TraitItem(..) | PathSource::Delegation => false,
         }
     }
@@ -465,7 +469,7 @@ impl<'a> PathSource<'a> {
                 },
                 _ => "value",
             },
-            PathSource::Delegation => "function",
+            PathSource::ReturnTypeNotation | PathSource::Delegation => "function",
         }
     }
 
@@ -533,6 +537,10 @@ impl<'a> PathSource<'a> {
                 Res::Def(DefKind::AssocTy, _) if ns == TypeNS => true,
                 _ => false,
             },
+            PathSource::ReturnTypeNotation => match res {
+                Res::Def(DefKind::AssocFn, _) => true,
+                _ => false,
+            },
             PathSource::Delegation => matches!(res, Res::Def(DefKind::Fn | DefKind::AssocFn, _)),
         }
     }
@@ -549,8 +557,8 @@ impl<'a> PathSource<'a> {
             (PathSource::Expr(..), false) | (PathSource::Delegation, false) => E0425,
             (PathSource::Pat | PathSource::TupleStruct(..), true) => E0532,
             (PathSource::Pat | PathSource::TupleStruct(..), false) => E0531,
-            (PathSource::TraitItem(..), true) => E0575,
-            (PathSource::TraitItem(..), false) => E0576,
+            (PathSource::TraitItem(..), true) | (PathSource::ReturnTypeNotation, true) => E0575,
+            (PathSource::TraitItem(..), false) | (PathSource::ReturnTypeNotation, false) => E0576,
         }
     }
 }
@@ -763,7 +771,20 @@ impl<'a: 'ast, 'ast, 'tcx> Visitor<'ast> for LateResolutionVisitor<'a, '_, 'ast,
             }
             TyKind::Path(qself, path) => {
                 self.diag_metadata.current_type_path = Some(ty);
-                self.smart_resolve_path(ty.id, qself, path, PathSource::Type);
+
+                // If we have a path that ends with `(..)`, then it must be
+                // return type notation. Resolve that path in the *value*
+                // namespace.
+                let source = if let Some(seg) = path.segments.last()
+                    && let Some(args) = &seg.args
+                    && matches!(**args, GenericArgs::ParenthesizedElided(..))
+                {
+                    PathSource::ReturnTypeNotation
+                } else {
+                    PathSource::Type
+                };
+
+                self.smart_resolve_path(ty.id, qself, path, source);
 
                 // Check whether we should interpret this as a bare trait object.
                 if qself.is_none()
@@ -1878,7 +1899,10 @@ impl<'a: 'ast, 'b, 'ast, 'tcx> LateResolutionVisitor<'a, 'b, 'ast, 'tcx> {
             );
 
             let inferred = match source {
-                PathSource::Trait(..) | PathSource::TraitItem(..) | PathSource::Type => false,
+                PathSource::Trait(..)
+                | PathSource::TraitItem(..)
+                | PathSource::Type
+                | PathSource::ReturnTypeNotation => false,
                 PathSource::Expr(..)
                 | PathSource::Pat
                 | PathSource::Struct

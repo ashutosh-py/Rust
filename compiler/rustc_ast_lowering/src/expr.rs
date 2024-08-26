@@ -20,10 +20,10 @@ use super::errors::{
     NeverPatternWithBody, NeverPatternWithGuard, UnderscoreExprLhsAssign,
 };
 use super::{
-    ImplTraitContext, LoweringContext, ParamMode, ParenthesizedGenericArgs, ResolverAstLoweringExt,
+    GenericArgsMode, ImplTraitContext, LoweringContext, ParamMode, ResolverAstLoweringExt,
 };
 use crate::errors::YieldInClosure;
-use crate::{fluent_generated, FnDeclKind, ImplTraitPosition};
+use crate::{fluent_generated, AllowReturnTypeNotation, FnDeclKind, ImplTraitPosition};
 
 impl<'hir> LoweringContext<'_, 'hir> {
     fn lower_exprs(&mut self, exprs: &[AstP<Expr>]) -> &'hir [hir::Expr<'hir>] {
@@ -107,7 +107,7 @@ impl<'hir> LoweringContext<'_, 'hir> {
                         e.span,
                         seg,
                         ParamMode::Optional,
-                        ParenthesizedGenericArgs::Err,
+                        GenericArgsMode::Err,
                         ImplTraitContext::Disallowed(ImplTraitPosition::Path),
                         // Method calls can't have bound modifiers
                         None,
@@ -281,6 +281,7 @@ impl<'hir> LoweringContext<'_, 'hir> {
                         qself,
                         path,
                         ParamMode::Optional,
+                        AllowReturnTypeNotation::No,
                         ImplTraitContext::Disallowed(ImplTraitPosition::Path),
                         None,
                     );
@@ -328,6 +329,7 @@ impl<'hir> LoweringContext<'_, 'hir> {
                             &se.qself,
                             &se.path,
                             ParamMode::Optional,
+                            AllowReturnTypeNotation::No,
                             ImplTraitContext::Disallowed(ImplTraitPosition::Path),
                             None,
                         )),
@@ -1291,6 +1293,7 @@ impl<'hir> LoweringContext<'_, 'hir> {
                         qself,
                         path,
                         ParamMode::Optional,
+                        AllowReturnTypeNotation::No,
                         ImplTraitContext::Disallowed(ImplTraitPosition::Path),
                         None,
                     );
@@ -1311,6 +1314,7 @@ impl<'hir> LoweringContext<'_, 'hir> {
                         qself,
                         path,
                         ParamMode::Optional,
+                        AllowReturnTypeNotation::No,
                         ImplTraitContext::Disallowed(ImplTraitPosition::Path),
                         None,
                     );
@@ -1336,6 +1340,7 @@ impl<'hir> LoweringContext<'_, 'hir> {
                     &se.qself,
                     &se.path,
                     ParamMode::Optional,
+                    AllowReturnTypeNotation::No,
                     ImplTraitContext::Disallowed(ImplTraitPosition::Path),
                     None,
                 );
