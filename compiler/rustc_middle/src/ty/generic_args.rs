@@ -483,27 +483,27 @@ impl<'tcx> GenericArgs<'tcx> {
     }
 
     #[inline]
-    pub fn types(&'tcx self) -> impl DoubleEndedIterator<Item = Ty<'tcx>> + 'tcx {
+    pub fn types(&self) -> impl DoubleEndedIterator<Item = Ty<'tcx>> {
         self.iter().filter_map(|k| k.as_type())
     }
 
     #[inline]
-    pub fn regions(&'tcx self) -> impl DoubleEndedIterator<Item = ty::Region<'tcx>> + 'tcx {
+    pub fn regions(&self) -> impl DoubleEndedIterator<Item = ty::Region<'tcx>> {
         self.iter().filter_map(|k| k.as_region())
     }
 
     #[inline]
-    pub fn consts(&'tcx self) -> impl DoubleEndedIterator<Item = ty::Const<'tcx>> + 'tcx {
+    pub fn consts(&self) -> impl DoubleEndedIterator<Item = ty::Const<'tcx>> {
         self.iter().filter_map(|k| k.as_const())
     }
 
     /// Returns generic arguments that are not lifetimes or host effect params.
     #[inline]
     pub fn non_erasable_generics(
-        &'tcx self,
+        &self,
         tcx: TyCtxt<'tcx>,
         def_id: DefId,
-    ) -> impl DoubleEndedIterator<Item = GenericArgKind<'tcx>> + 'tcx {
+    ) -> impl DoubleEndedIterator<Item = GenericArgKind<'tcx>> {
         let generics = tcx.generics_of(def_id);
         self.iter().enumerate().filter_map(|(i, k)| match k.unpack() {
             _ if Some(i) == generics.host_effect_index => None,

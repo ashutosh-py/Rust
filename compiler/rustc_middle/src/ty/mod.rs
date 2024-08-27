@@ -1496,7 +1496,7 @@ impl<'tcx> TyCtxt<'tcx> {
         self.typeck(self.hir().body_owner_def_id(body))
     }
 
-    pub fn provided_trait_methods(self, id: DefId) -> impl 'tcx + Iterator<Item = &'tcx AssocItem> {
+    pub fn provided_trait_methods(self, id: DefId) -> impl Iterator<Item = &'tcx AssocItem> {
         self.associated_items(id)
             .in_definition_order()
             .filter(move |item| item.kind == AssocKind::Fn && item.defaultness(self).has_value())
@@ -1790,14 +1790,11 @@ impl<'tcx> TyCtxt<'tcx> {
         }
     }
 
-    pub fn get_attrs_by_path<'attr>(
+    pub fn get_attrs_by_path(
         self,
         did: DefId,
-        attr: &'attr [Symbol],
-    ) -> impl Iterator<Item = &'tcx ast::Attribute> + 'attr
-    where
-        'tcx: 'attr,
-    {
+        attr: &[Symbol],
+    ) -> impl Iterator<Item = &'tcx ast::Attribute> {
         let filter_fn = move |a: &&ast::Attribute| a.path_matches(attr);
         if let Some(did) = did.as_local() {
             self.hir().attrs(self.local_def_id_to_hir_id(did)).iter().filter(filter_fn)

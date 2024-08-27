@@ -310,7 +310,7 @@ impl<'tcx> UniversalRegions<'tcx> {
 
     /// Returns an iterator over all the RegionVids corresponding to
     /// universally quantified free regions.
-    pub(crate) fn universal_regions(&self) -> impl Iterator<Item = RegionVid> {
+    pub(crate) fn universal_regions(&self) -> impl Iterator<Item = RegionVid> + use<> {
         (FIRST_GLOBAL_INDEX..self.num_universals).map(RegionVid::from_usize)
     }
 
@@ -334,9 +334,9 @@ impl<'tcx> UniversalRegions<'tcx> {
     }
 
     /// Gets an iterator over all the early-bound regions that have names.
-    pub(crate) fn named_universal_regions<'s>(
-        &'s self,
-    ) -> impl Iterator<Item = (ty::Region<'tcx>, ty::RegionVid)> + 's {
+    pub(crate) fn named_universal_regions(
+        &self,
+    ) -> impl Iterator<Item = (ty::Region<'tcx>, ty::RegionVid)> {
         self.indices.indices.iter().map(|(&r, &v)| (r, v))
     }
 

@@ -2,7 +2,6 @@ use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::ops::{Index, IndexMut};
 
-use rustc_data_structures::captures::Captures;
 use rustc_data_structures::fx::FxHashSet;
 use rustc_data_structures::graph::dominators::{self, Dominators};
 use rustc_data_structures::graph::{self, DirectedGraph, StartNode};
@@ -535,10 +534,10 @@ fn find_loop_backedges(
     backedges
 }
 
-fn short_circuit_preorder<'a, 'tcx, F, Iter>(
-    body: &'a mir::Body<'tcx>,
+fn short_circuit_preorder<'tcx, F, Iter>(
+    body: &mir::Body<'tcx>,
     filtered_successors: F,
-) -> impl Iterator<Item = BasicBlock> + Captures<'a> + Captures<'tcx>
+) -> impl Iterator<Item = BasicBlock>
 where
     F: Fn(BasicBlock) -> Iter,
     Iter: IntoIterator<Item = BasicBlock>,

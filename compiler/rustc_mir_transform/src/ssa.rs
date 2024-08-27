@@ -131,9 +131,9 @@ impl SsaLocals {
     }
 
     pub fn assignments<'a, 'tcx>(
-        &'a self,
+        &self,
         body: &'a Body<'tcx>,
-    ) -> impl Iterator<Item = (Local, &'a Rvalue<'tcx>, Location)> + 'a {
+    ) -> impl Iterator<Item = (Local, &'a Rvalue<'tcx>, Location)> {
         self.assignment_order.iter().filter_map(|&local| {
             if let Set1::One(DefLocation::Assignment(loc)) = self.assignments[local] {
                 let stmt = body.stmt_at(loc).left()?;

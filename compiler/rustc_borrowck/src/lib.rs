@@ -2,6 +2,7 @@
 
 // tidy-alphabetical-start
 #![allow(internal_features)]
+#![cfg_attr(bootstrap, feature(precise_capturing))]
 #![doc(rust_logo)]
 #![feature(assert_matches)]
 #![feature(box_patterns)]

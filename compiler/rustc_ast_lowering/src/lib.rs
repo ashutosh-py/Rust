@@ -46,7 +46,6 @@ use rustc_ast::node_id::NodeMap;
 use rustc_ast::ptr::P;
 use rustc_ast::{self as ast, *};
 use rustc_ast_pretty::pprust;
-use rustc_data_structures::captures::Captures;
 use rustc_data_structures::fingerprint::Fingerprint;
 use rustc_data_structures::fx::FxIndexSet;
 use rustc_data_structures::sorted_map::SortedMap;
@@ -2096,11 +2095,11 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         self.new_named_lifetime_with_res(new_id, ident, res)
     }
 
-    fn lower_generic_params_mut<'s>(
-        &'s mut self,
-        params: &'s [GenericParam],
+    fn lower_generic_params_mut(
+        &mut self,
+        params: &[GenericParam],
         source: hir::GenericParamSource,
-    ) -> impl Iterator<Item = hir::GenericParam<'hir>> + Captures<'a> + Captures<'s> {
+    ) -> impl Iterator<Item = hir::GenericParam<'hir>> {
         params.iter().map(move |param| self.lower_generic_param(param, source))
     }
 
@@ -2260,11 +2259,11 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         self.arena.alloc_from_iter(self.lower_param_bounds_mut(bounds, itctx))
     }
 
-    fn lower_param_bounds_mut<'s>(
-        &'s mut self,
-        bounds: &'s [GenericBound],
+    fn lower_param_bounds_mut(
+        &mut self,
+        bounds: &[GenericBound],
         itctx: ImplTraitContext,
-    ) -> impl Iterator<Item = hir::GenericBound<'hir>> + Captures<'s> + Captures<'a> {
+    ) -> impl Iterator<Item = hir::GenericBound<'hir>> {
         bounds.iter().map(move |bound| self.lower_param_bound(bound, itctx))
     }
 

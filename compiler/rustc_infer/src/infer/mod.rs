@@ -12,7 +12,6 @@ use region_constraints::{
 };
 pub use relate::combine::{CombineFields, PredicateEmittingRelation};
 pub use relate::StructurallyRelateAliases;
-use rustc_data_structures::captures::Captures;
 use rustc_data_structures::fx::{FxHashSet, FxIndexMap};
 use rustc_data_structures::sync::Lrc;
 use rustc_data_structures::undo_log::Rollback;
@@ -237,7 +236,7 @@ impl<'tcx> InferCtxtInner<'tcx> {
     // while looping through this.
     pub fn iter_opaque_types(
         &self,
-    ) -> impl Iterator<Item = (ty::OpaqueTypeKey<'tcx>, ty::OpaqueHiddenType<'tcx>)> + '_ {
+    ) -> impl Iterator<Item = (ty::OpaqueTypeKey<'tcx>, ty::OpaqueHiddenType<'tcx>)> {
         self.opaque_type_storage.opaque_types.iter().map(|(&k, v)| (k, v.hidden_type))
     }
 }
@@ -1474,9 +1473,7 @@ impl<'tcx> InferCtxt<'tcx> {
     /// The returned function is used in a fast path. If it returns `true` the variable is
     /// unchanged, `false` indicates that the status is unknown.
     #[inline]
-    pub fn is_ty_infer_var_definitely_unchanged<'a>(
-        &'a self,
-    ) -> (impl Fn(TyOrConstInferVar) -> bool + Captures<'tcx> + 'a) {
+    pub fn is_ty_infer_var_definitely_unchanged(&self) -> impl Fn(TyOrConstInferVar) -> bool {
         // This hoists the borrow/release out of the loop body.
         let inner = self.inner.try_borrow();
 
