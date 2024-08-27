@@ -27,7 +27,7 @@ use rustc_span::source_map::Spanned;
 use rustc_span::{Span, DUMMY_SP};
 use rustc_target::abi::call::FnAbi;
 use rustc_target::abi::{HasDataLayout, TargetDataLayout, VariantIdx};
-use rustc_target::spec::{HasTargetSpec, RelocModel, Target, TlsModel};
+use rustc_target::spec::{HasTargetSpec, RelocModel, SmallDataThresholdSupport, Target, TlsModel};
 use smallvec::SmallVec;
 
 use crate::back::write::to_llvm_code_model;
@@ -386,6 +386,26 @@ pub(crate) unsafe fn create_module<'ll>(
             )
         }
     }
+
+    match (
+        sess.opts.unstable_opts.small_data_threshold,
+        &sess.target.options.small_data_threshold_support,
+    ) {
+        // Set up the small-data optimization limit for architectures that use
+        // an LLVM module flag to control this.
+        (Some(threshold), SmallDataThresholdSupport::LlvmModuleFlag(flag)) => {
+            let flag = format!("{flag}\0");
+            unsafe {
+                llvm::LLVMRustAddModuleFlagU32(
+                    llmod,
+                    llvm::LLVMModFlagBehavior::Error,
+                    flag.as_str().as_ptr().cast(),
+                    threshold as u32,
+                )
+            }
+        }
+        _ => (),
+    };
 
     // Insert `llvm.ident` metadata.
     //

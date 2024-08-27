@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 
-use crate::spec::{base, CodeModel, SplitDebuginfo, Target, TargetOptions};
+use crate::spec::{
+    base, CodeModel, SmallDataThresholdSupport, SplitDebuginfo, Target, TargetOptions,
+};
 
 pub fn target() -> Target {
     Target {
@@ -22,6 +24,9 @@ pub fn target() -> Target {
             max_atomic_width: Some(64),
             supported_split_debuginfo: Cow::Borrowed(&[SplitDebuginfo::Off]),
             crt_static_default: false,
+            small_data_threshold_support: SmallDataThresholdSupport::LlvmModuleFlag(
+                "SmallDataLimit".into(),
+            ),
             ..base::linux_musl::opts()
         },
     }

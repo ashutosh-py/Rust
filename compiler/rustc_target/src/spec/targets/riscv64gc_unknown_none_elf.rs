@@ -1,6 +1,6 @@
 use crate::spec::{
-    Cc, CodeModel, LinkerFlavor, Lld, PanicStrategy, RelocModel, SanitizerSet, Target,
-    TargetOptions,
+    Cc, CodeModel, LinkerFlavor, Lld, PanicStrategy, RelocModel, SanitizerSet,
+    SmallDataThresholdSupport, Target, TargetOptions,
 };
 
 pub fn target() -> Target {
@@ -29,6 +29,9 @@ pub fn target() -> Target {
             emit_debug_gdb_scripts: false,
             eh_frame_header: false,
             supported_sanitizers: SanitizerSet::KERNELADDRESS,
+            small_data_threshold_support: SmallDataThresholdSupport::LlvmModuleFlag(
+                "SmallDataLimit".into(),
+            ),
             ..Default::default()
         },
     }
