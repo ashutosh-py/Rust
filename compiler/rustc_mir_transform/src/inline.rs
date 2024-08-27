@@ -32,7 +32,7 @@ pub(crate) mod cycle;
 
 const TOP_DOWN_DEPTH_LIMIT: usize = 5;
 
-pub struct Inline;
+pub(super) struct Inline;
 
 #[derive(Copy, Clone, Debug)]
 struct CallSite<'tcx> {

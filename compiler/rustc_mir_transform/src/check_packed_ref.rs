@@ -5,7 +5,7 @@ use rustc_middle::ty::{self, TyCtxt};
 
 use crate::{errors, util, MirLint};
 
-pub struct CheckPackedRef;
+pub(super) struct CheckPackedRef;
 
 impl<'tcx> MirLint<'tcx> for CheckPackedRef {
     fn run_lint(&self, tcx: TyCtxt<'tcx>, body: &Body<'tcx>) {

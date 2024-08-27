@@ -9,7 +9,7 @@ use rustc_session::config::{OutFileName, OutputType};
 
 use crate::MirPass;
 
-pub struct Marker(pub &'static str);
+pub(super) struct Marker(pub &'static str);
 
 impl<'tcx> MirPass<'tcx> for Marker {
     fn name(&self) -> &'static str {

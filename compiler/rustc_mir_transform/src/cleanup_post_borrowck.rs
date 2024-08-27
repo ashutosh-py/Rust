@@ -23,7 +23,7 @@ use rustc_middle::ty::TyCtxt;
 
 use crate::MirPass;
 
-pub struct CleanupPostBorrowck;
+pub(super) struct CleanupPostBorrowck;
 
 impl<'tcx> MirPass<'tcx> for CleanupPostBorrowck {
     fn run_pass(&self, _tcx: TyCtxt<'tcx>, body: &mut Body<'tcx>) {
