@@ -729,8 +729,6 @@ pub enum BuiltinLintDiag {
     UnnameableTestItems,
     DuplicateMacroAttribute,
     CfgAttrNoAttributes,
-    CrateTypeInCfgAttr,
-    CrateNameInCfgAttr,
     MissingFragmentSpecifier,
     MetaVariableStillRepeating(MacroRulesNormalizedIdent),
     MetaVariableWrongOperator,
