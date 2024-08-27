@@ -1341,7 +1341,7 @@ impl<'a, 'b, 'tcx> Visitor<'b> for BuildReducedGraphVisitor<'a, 'b, 'tcx> {
                         // This way they can use `macro_rules` defined later.
                         self.visit_vis(&item.vis);
                         self.visit_ident(item.ident);
-                        item.kind.walk(item, AssocCtxt::Trait, self);
+                        item.kind.walk(item, self);
                         visit::walk_list!(self, visit_attribute, &item.attrs);
                     }
                     _ => visit::walk_item(self, item),
