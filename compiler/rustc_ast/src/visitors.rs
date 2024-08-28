@@ -139,6 +139,13 @@ macro_rules! mutability_helpers {
             };
             ($a: expr) => {};
         }
+
+        macro_rules! derive_copy_clone {
+            ($i: item) => {
+                #[derive(Copy, Clone)]
+                $i
+            }
+        }
     };
     (mut) => {
         macro_rules! if_mut_ty {
@@ -169,6 +176,12 @@ macro_rules! mutability_helpers {
             ($a: expr) => {
                 $a
             };
+        }
+
+        macro_rules! derive_copy_clone {
+            ($i: item) => {
+                $i
+            }
         }
     };
 }
@@ -1040,6 +1053,17 @@ macro_rules! make_ast_visitor {
             return_result!(V)
         }
 
+        derive_copy_clone!{
+            #[derive(Debug)]
+            pub enum FnKind<'a> {
+                /// E.g., `fn foo()`, `fn foo(&self)`, or `extern "Abi" fn foo()`.
+                Fn(FnCtxt, Ident, &'a $($mut)? FnSig, &'a $($mut)? Visibility, &'a $($mut)? Generics, &'a $($mut)? Option<P<Block>>),
+
+                /// E.g., `|x, y| body`.
+                Closure(&'a $($mut)? ClosureBinder, &'a $($mut)? Option<CoroutineKind>, &'a $($mut)? P!(FnDecl), &'a $($mut)? P!(Expr)),
+            }
+        }
+
         make_walk_flat_map!{Arm, walk_flat_map_arm, visit_arm}
         make_walk_flat_map!{Attribute, walk_flat_map_attribute, visit_attribute}
         make_walk_flat_map!{ExprField, walk_flat_map_expr_field, visit_expr_field}
@@ -1119,15 +1143,6 @@ pub mod visit {
         }
     }
 
-    #[derive(Copy, Clone, Debug)]
-    pub enum FnKind<'a> {
-        /// E.g., `fn foo()`, `fn foo(&self)`, or `extern "Abi" fn foo()`.
-        Fn(FnCtxt, Ident, &'a FnSig, &'a Visibility, &'a Generics, Option<&'a Block>),
-
-        /// E.g., `|x, y| body`.
-        Closure(&'a ClosureBinder, &'a Option<CoroutineKind>, &'a FnDecl, &'a Expr),
-    }
-
     impl<'a> FnKind<'a> {
         pub fn header(&self) -> Option<&'a FnHeader> {
             match *self {
@@ -1204,7 +1219,7 @@ pub mod visit {
                 }
                 ItemKind::Fn(box Fn { defaultness: _, generics, sig, body }) => {
                     let kind =
-                        FnKind::Fn(FnCtxt::Free, *ident, sig, vis, generics, body.as_deref());
+                        FnKind::Fn(FnCtxt::Free, *ident, sig, vis, generics, body);
                     try_visit!(visitor.visit_fn(kind, span, id));
                 }
                 ItemKind::Mod(_unsafety, mod_kind) => match mod_kind {
@@ -1389,7 +1404,7 @@ pub mod visit {
                 }
                 ForeignItemKind::Fn(box Fn { defaultness: _, generics, sig, body }) => {
                     let kind =
-                        FnKind::Fn(FnCtxt::Foreign, *ident, sig, vis, generics, body.as_deref());
+                        FnKind::Fn(FnCtxt::Foreign, *ident, sig, vis, generics, body);
                     try_visit!(visitor.visit_fn(kind, span, id));
                 }
                 ForeignItemKind::TyAlias(box TyAlias {
@@ -1493,7 +1508,7 @@ pub mod visit {
             }
             AssocItemKind::Fn(box Fn { defaultness: _, generics, sig, body }) => {
                 let kind =
-                    FnKind::Fn(FnCtxt::Assoc(ctxt), ident, sig, vis, generics, body.as_deref());
+                    FnKind::Fn(FnCtxt::Assoc(ctxt), ident, sig, vis, generics, body);
                 try_visit!(visitor.visit_fn(kind, span, id));
             }
             AssocItemKind::Type(box TyAlias {
@@ -1795,7 +1810,7 @@ pub mod mut_visit {
     use crate::ptr::P;
     use crate::token::{self, Token};
     use crate::tokenstream::*;
-    use crate::visit::{AssocCtxt, BoundKind, LifetimeCtxt};
+    use crate::visit::{AssocCtxt, BoundKind, LifetimeCtxt, FnCtxt};
 
     pub trait ExpectOne<A: Array> {
         fn expect_one(self, err: &'static str) -> A::Item;
@@ -2235,7 +2250,7 @@ pub mod mut_visit {
 
     fn walk_fn<T: MutVisitor>(vis: &mut T, kind: FnKind<'_>) {
         match kind {
-            FnKind::Fn(FnSig { header, decl, span }, generics, body) => {
+            FnKind::Fn(_, _, FnSig { header, decl, span }, _, generics, body) => {
                 // Identifier and visibility are visited as a part of the item.
                 vis.visit_fn_header(header);
                 vis.visit_generics(generics);
@@ -2245,7 +2260,10 @@ pub mod mut_visit {
                 }
                 vis.visit_span(span);
             }
-            FnKind::Closure(binder, decl, body) => {
+            FnKind::Closure(binder, coroutine_kind, decl, body) => {
+                coroutine_kind
+                    .as_mut()
+                    .map(|coroutine_kind| vis.visit_coroutine_kind(coroutine_kind));
                 vis.visit_closure_binder(binder);
                 vis.visit_fn_decl(decl);
                 vis.visit_expr(body);
@@ -2311,8 +2329,8 @@ pub mod mut_visit {
             &mut self,
             id: NodeId,
             span: Span,
-            _vis: &mut Visibility,
-            _ident: &mut Ident,
+            vis: &mut Visibility,
+            ident: &mut Ident,
             visitor: &mut impl MutVisitor
         ) {
             match self {
@@ -2327,7 +2345,9 @@ pub mod mut_visit {
                 }
                 ItemKind::Fn(box Fn { defaultness, generics, sig, body }) => {
                     visit_defaultness(visitor, defaultness);
-                    visitor.visit_fn(FnKind::Fn(sig, generics, body), span, id);
+                    let kind =
+                        FnKind::Fn(FnCtxt::Free, *ident, sig, vis, generics, body);
+                    visitor.visit_fn(kind, span, id);
                 }
                 ItemKind::Mod(safety, mod_kind) => {
                     visit_safety(visitor, safety);
@@ -2469,7 +2489,7 @@ pub mod mut_visit {
         smallvec![item]
     }
 
-    pub fn walk_assoc_item(visitor: &mut impl MutVisitor, item: &mut Item<AssocItemKind>, _ctxt: AssocCtxt) {
+    pub fn walk_assoc_item(visitor: &mut impl MutVisitor, item: &mut Item<AssocItemKind>, ctxt: AssocCtxt) {
         let Item { attrs, id, span, vis, ident, kind, tokens } = item;
         visitor.visit_id(id);
         visit_attrs(visitor, attrs);
@@ -2481,7 +2501,9 @@ pub mod mut_visit {
             }
             AssocItemKind::Fn(box Fn { defaultness, generics, sig, body }) => {
                 visit_defaultness(visitor, defaultness);
-                visitor.visit_fn(FnKind::Fn(sig, generics, body), *span, *id);
+                let kind =
+                    FnKind::Fn(FnCtxt::Assoc(ctxt), *ident, sig, vis, generics, body);
+                visitor.visit_fn(kind, *span, *id);
             }
             AssocItemKind::Type(box TyAlias {
                 defaultness,
@@ -2555,8 +2577,8 @@ pub mod mut_visit {
             &mut self,
             id: NodeId,
             span: Span,
-            _vis: &mut Visibility,
-            _ident: &mut Ident,
+            vis: &mut Visibility,
+            ident: &mut Ident,
             visitor: &mut impl MutVisitor) {
             match self {
                 ForeignItemKind::Static(box StaticItem { ty, mutability: _, expr, safety: _ }) => {
@@ -2565,7 +2587,9 @@ pub mod mut_visit {
                 }
                 ForeignItemKind::Fn(box Fn { defaultness, generics, sig, body }) => {
                     visit_defaultness(visitor, defaultness);
-                    visitor.visit_fn(FnKind::Fn(sig, generics, body), span, id);
+                    let kind =
+                        FnKind::Fn(FnCtxt::Foreign, *ident, sig, vis, generics, body);
+                    visitor.visit_fn(kind, span, id);
                 }
                 ForeignItemKind::TyAlias(box TyAlias {
                     defaultness,
@@ -2674,11 +2698,8 @@ pub mod mut_visit {
                 fn_arg_span,
             }) => {
                 visit_constness(vis, constness);
-                coroutine_kind
-                    .as_mut()
-                    .map(|coroutine_kind| vis.visit_coroutine_kind(coroutine_kind));
                 vis.visit_capture_by(capture_clause);
-                vis.visit_fn(FnKind::Closure(binder, fn_decl, body), *span, *id);
+                vis.visit_fn(FnKind::Closure(binder, coroutine_kind, fn_decl, body), *span, *id);
                 vis.visit_span(fn_decl_span);
                 vis.visit_span(fn_arg_span);
             }
@@ -2921,14 +2942,5 @@ pub mod mut_visit {
         fn dummy() -> Self {
             crate::ast_traits::AstNodeWrapper::new(N::dummy(), T::dummy())
         }
-    }
-
-    #[derive(Debug)]
-    pub enum FnKind<'a> {
-        /// E.g., `fn foo()`, `fn foo(&self)`, or `extern "Abi" fn foo()`.
-        Fn(&'a mut FnSig, &'a mut Generics, &'a mut Option<P<Block>>),
-
-        /// E.g., `|x, y| body`.
-        Closure(&'a mut ClosureBinder, &'a mut P<FnDecl>, &'a mut P<Expr>),
     }
 }
