@@ -872,7 +872,7 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
     /// Dereference a pointer operand to a place using `layout` instead of the pointer's declared type
     fn deref_pointer_as(
         &self,
-        op: &impl Readable<'tcx, Provenance>,
+        op: &impl Projectable<'tcx, Provenance>,
         layout: TyAndLayout<'tcx>,
     ) -> InterpResult<'tcx, MPlaceTy<'tcx>> {
         let this = self.eval_context_ref();
@@ -883,7 +883,7 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
     /// Calculates the MPlaceTy given the offset and layout of an access on an operand
     fn deref_pointer_and_offset(
         &self,
-        op: &impl Readable<'tcx, Provenance>,
+        op: &impl Projectable<'tcx, Provenance>,
         offset: u64,
         base_layout: TyAndLayout<'tcx>,
         value_layout: TyAndLayout<'tcx>,
@@ -900,7 +900,7 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
 
     fn deref_pointer_and_read(
         &self,
-        op: &impl Readable<'tcx, Provenance>,
+        op: &impl Projectable<'tcx, Provenance>,
         offset: u64,
         base_layout: TyAndLayout<'tcx>,
         value_layout: TyAndLayout<'tcx>,
@@ -912,7 +912,7 @@ pub trait EvalContextExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
 
     fn deref_pointer_and_write(
         &mut self,
-        op: &impl Readable<'tcx, Provenance>,
+        op: &impl Projectable<'tcx, Provenance>,
         offset: u64,
         value: impl Into<Scalar>,
         base_layout: TyAndLayout<'tcx>,
