@@ -1362,13 +1362,6 @@ impl CurrentGcx {
 
 impl<'tcx> TyCtxt<'tcx> {
     pub fn has_typeck_results(self, def_id: LocalDefId) -> bool {
-        // Closures' typeck results come from their outermost function,
-        // as they are part of the same "inference environment".
-        let typeck_root_def_id = self.typeck_root_def_id(def_id.to_def_id());
-        if typeck_root_def_id != def_id.to_def_id() {
-            return self.has_typeck_results(typeck_root_def_id.expect_local());
-        }
-
         self.hir_node_by_def_id(def_id).body_id().is_some()
     }
 

@@ -602,6 +602,45 @@ impl<'tcx> TyCtxt<'tcx> {
     /// `typeck` the closure, for example, we really wind up
     /// fetching the `typeck` the enclosing fn item.
     pub fn typeck_root_def_id(self, def_id: DefId) -> DefId {
+        // It only really makes sense to call this for a body that is typeck'd.
+        if cfg!(debug_assertions) {
+            match self.def_kind(def_id) {
+                DefKind::Fn
+                | DefKind::Const
+                | DefKind::Static { .. }
+                | DefKind::Ctor(..)
+                | DefKind::AssocFn
+                | DefKind::AssocConst
+                | DefKind::AnonConst
+                | DefKind::InlineConst
+                | DefKind::Closure => {}
+                kind @ (DefKind::Mod
+                | DefKind::Struct
+                | DefKind::Union
+                | DefKind::Enum
+                | DefKind::Variant
+                | DefKind::Trait
+                | DefKind::TyAlias
+                | DefKind::ForeignTy
+                | DefKind::TraitAlias
+                | DefKind::AssocTy
+                | DefKind::TyParam
+                | DefKind::ConstParam
+                | DefKind::Macro(_)
+                | DefKind::ExternCrate
+                | DefKind::Use
+                | DefKind::ForeignMod
+                | DefKind::OpaqueTy
+                | DefKind::Field
+                | DefKind::LifetimeParam
+                | DefKind::GlobalAsm
+                | DefKind::Impl { .. }
+                | DefKind::SyntheticCoroutineBody) => {
+                    bug!("unexpected typeck_root_def_id call for {def_id:?} ({kind:?})");
+                }
+            }
+        }
+
         let mut def_id = def_id;
         while self.is_typeck_child(def_id) {
             def_id = self.parent(def_id);
