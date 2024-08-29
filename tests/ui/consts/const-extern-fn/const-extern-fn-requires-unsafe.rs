@@ -1,5 +1,3 @@
-#![feature(const_extern_fn)]
-
 const unsafe extern "C" fn foo() -> usize {
     5
 }
