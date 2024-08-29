@@ -99,12 +99,7 @@ fn instrument_function_for_coverage<'tcx>(tcx: TyCtxt<'tcx>, mir_body: &mut mir:
     let mut coverage_counters =
         CoverageCounters::make_bcb_counters(&basic_coverage_blocks, bcb_has_counter_mappings);
 
-    let mappings = create_mappings(
-        tcx,
-        &hir_info,
-        &extracted_mappings,
-        &mut coverage_counters,
-    );
+    let mappings = create_mappings(tcx, &hir_info, &extracted_mappings, &mut coverage_counters);
     if mappings.is_empty() {
         // No spans could be converted into valid mappings, so skip this function.
         debug!("no spans could be converted into valid mappings; skipping");
@@ -145,7 +140,7 @@ fn instrument_function_for_coverage<'tcx>(tcx: TyCtxt<'tcx>, mir_body: &mut mir:
 fn create_mappings<'tcx>(
     tcx: TyCtxt<'tcx>,
     hir_info: &ExtractedHirInfo,
-    extracted_mappings: & ExtractedMappings,
+    extracted_mappings: &ExtractedMappings,
     coverage_counters: &mut CoverageCounters,
 ) -> Vec<Mapping> {
     let source_map = tcx.sess.source_map();
@@ -204,11 +199,13 @@ fn create_mappings<'tcx>(
                 coverage_counters.bcb_counter(bcb).expect("all BCBs with spans were given counters")
             })
             .collect::<Vec<_>>();
-        let counter = counters
+        // Some patterns may have folded conditions. E.g The first `true` of `(false, false) | (true, true)` is
+        // never failed to match if tested. Such condition has no counter for one branch hence we treat them as folded.
+        counters
             .into_iter()
             .fold(None, |acc, val| Some(coverage_counters.make_sum_expression(acc, val)))
-            .expect("counters must be non-empty");
-        counter.as_term()
+            .map(|c| c.as_term())
+            .unwrap_or(mir::coverage::CovTerm::Zero)
     };
 
     // MCDC branch mappings are appended with their decisions in case decisions were ignored.

@@ -184,9 +184,9 @@ impl CoverageInfoBuilder {
             num_block_markers,
             branch_spans,
             mcdc_degraded_spans,
-            mcdc_spans
-    })
-}
+            mcdc_spans,
+        })
+    }
 }
 
 impl<'tcx> Builder<'_, 'tcx> {
