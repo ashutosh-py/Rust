@@ -1,6 +1,5 @@
 #![warn(clippy::missing_const_for_fn)]
 #![allow(unsupported_calling_conventions)]
-#![feature(const_extern_fn)]
 
 const extern "C-unwind" fn c_unwind() {}
 //~^ ERROR: this could be a `const fn`
