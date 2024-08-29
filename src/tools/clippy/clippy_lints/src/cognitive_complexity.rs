@@ -4,6 +4,7 @@ use clippy_utils::source::{IntoSpan, SpanRangeExt};
 use clippy_utils::ty::is_type_diagnostic_item;
 use clippy_utils::visitors::for_each_expr_without_closures;
 use clippy_utils::{get_async_fn_body, is_async_fn, LimitStack};
+use rustc_lint::{Level::Allow, Lint};
 use core::ops::ControlFlow;
 use rustc_ast::ast::Attribute;
 use rustc_hir::intravisit::FnKind;
@@ -13,25 +14,62 @@ use rustc_session::impl_lint_pass;
 use rustc_span::def_id::LocalDefId;
 use rustc_span::{sym, Span};
 
-declare_clippy_lint! {
-    /// ### What it does
-    /// Checks for methods with high cognitive complexity.
-    ///
-    /// ### Why is this bad?
-    /// Methods of high cognitive complexity tend to be hard to
-    /// both read and maintain. Also LLVM will tend to optimize small methods better.
-    ///
-    /// ### Known problems
-    /// Sometimes it's hard to find a way to reduce the
-    /// complexity.
-    ///
-    /// ### Example
-    /// You'll see it when you get the warning.
-    #[clippy::version = "1.35.0"]
-    pub COGNITIVE_COMPLEXITY,
-    nursery,
-    "functions that should be split up into multiple functions"
-}
+use crate::LintInfo;
+
+// declare_clippy_lint! {
+//     /// ### What it does
+//     /// Checks for methods with high cognitive complexity.
+//     ///
+//     /// ### Why is this bad?
+//     /// Methods of high cognitive complexity tend to be hard to
+//     /// both read and maintain. Also LLVM will tend to optimize small methods better.
+//     ///
+//     /// ### Known problems
+//     /// Sometimes it's hard to find a way to reduce the
+//     /// complexity.
+//     ///
+//     /// ### Example
+//     /// You'll see it when you get the warning.
+//     #[clippy::version = "1.35.0"]
+//     pub COGNITIVE_COMPLEXITY,
+//     nursery,
+//     "functions that should be split up into multiple functions"
+// }
+
+// Recursive expansion of declare_clippy_lint! macro
+// ==================================================
+
+#[doc = " ### What it does"]
+#[doc = " Checks for methods with high cognitive complexity."]
+#[doc = ""]
+#[doc = " ### Why is this bad?"]
+#[doc = " Methods of high cognitive complexity tend to be hard to"]
+#[doc = " both read and maintain. Also LLVM will tend to optimize small methods better."]
+#[doc = ""]
+#[doc = " ### Known problems"]
+#[doc = " Sometimes it\'s hard to find a way to reduce the"]
+#[doc = " complexity."]
+#[doc = ""]
+#[doc = " ### Example"]
+#[doc = " You\'ll see it when you get the warning."]
+#[clippy::version = "1.35.0"]
+pub static COGNITIVE_COMPLEXITY: &Lint = &Lint {
+    name: &"clippy::COGNITIVE_COMPLEXITY",
+    default_level: Allow,
+    desc: "functions that should be split up into multiple functions",
+    edition_lint_opts: None,
+    report_in_external_macro: true,
+    future_incompatible: None,
+    is_externally_loaded: true,
+    crate_level_only: false,
+    loadbearing: true,
+    ..Lint::default_fields_for_macro()
+};
+pub(crate) static COGNITIVE_COMPLEXITY_INFO: &'static LintInfo = &LintInfo {
+    lint: &COGNITIVE_COMPLEXITY,
+    category: crate::LintCategory::Nursery,
+    explanation: "### What it does\nChecks for methods with high cognitive complexity.\n\n### Why is this bad?\nMethods of high cognitive complexity tend to be hard to\nboth read and maintain. Also LLVM will tend to optimize small methods better.\n\n### Known problems\nSometimes it's hard to find a way to reduce the\ncomplexity.\n\n### Example\nYou'll see it when you get the warning.\n",
+};
 
 pub struct CognitiveComplexity {
     limit: LimitStack,

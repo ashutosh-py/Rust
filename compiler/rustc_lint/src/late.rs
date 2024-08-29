@@ -24,13 +24,14 @@ use rustc_hir::def_id::{LocalDefId, LocalModDefId};
 use rustc_hir::{intravisit as hir_visit, HirId};
 use rustc_middle::hir::nested_filter;
 use rustc_middle::ty::{self, TyCtxt};
+use rustc_session::lint::builtin::HardwiredLints;
 use rustc_session::lint::LintPass;
 use rustc_session::Session;
 use rustc_span::Span;
 use tracing::debug;
 
 use crate::passes::LateLintPassObject;
-use crate::{LateContext, LateLintPass, LintStore, LintId};
+use crate::{LateContext, LateLintPass, LintId, LintStore};
 
 /// Extract the [`LintStore`] from [`Session`].
 ///
@@ -378,12 +379,18 @@ pub fn late_lint_mod<'tcx, T: LateLintPass<'tcx> + 'tcx>(
             .into_iter()
             .filter(|pass| {
                 let lints = LintPass::get_lints(pass);
-                lints.iter()
-                    .any(|lint|
-                        !lints_that_dont_need_to_run.contains(&LintId::of(lint)))
-        }).collect();
+                if lints.is_empty() {
+                    true
+                } else {
+                    lints
+                        .iter()
+                        .any(|lint| !lints_that_dont_need_to_run.contains(&LintId::of(lint)))
+                }
+            })
+            .collect();
 
         filtered_passes.push(Box::new(builtin_lints));
+        filtered_passes.push(Box::new(HardwiredLints));
 
         let pass = RuntimeCombinedLateLintPass { passes: &mut filtered_passes[..] };
         late_lint_mod_inner(tcx, module_def_id, context, pass);
@@ -438,14 +445,14 @@ fn late_lint_crate<'tcx>(tcx: TyCtxt<'tcx>) {
 
     // dbg!(&lints_that_dont_need_to_run);
     let mut filtered_passes: Vec<Box<dyn LateLintPass<'tcx>>> = passes
-    .into_iter()
-    .filter(|pass|{
-        let lints = LintPass::get_lints(pass);
-        // dbg!(&lints);
-        lints.iter()
-            .any(|lint|
-                !lints_that_dont_need_to_run.contains(&LintId::of(lint)))
-    }).collect();
+        .into_iter()
+        .filter(|pass| {
+            let lints = LintPass::get_lints(pass);
+            !lints.iter().all(|lint| lints_that_dont_need_to_run.contains(&LintId::of(lint)))
+        })
+        .collect();
+
+    filtered_passes.push(Box::new(HardwiredLints));
 
     // let mut filtered_passes: Vec<Box<dyn LateLintPass<'tcx>>> = passes
     // .into_iter()
@@ -455,6 +462,7 @@ fn late_lint_crate<'tcx>(tcx: TyCtxt<'tcx>) {
     //         .any(|lint|
     //             !lints_that_dont_need_to_run.contains(&LintId::of(lint)))
     // }).collect();
+    //
 
     let pass = RuntimeCombinedLateLintPass { passes: &mut filtered_passes[..] };
     late_lint_crate_inner(tcx, context, pass);

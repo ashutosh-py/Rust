@@ -1,5 +1,5 @@
 use rustc_ast_pretty::pprust;
-use rustc_data_structures::{fx::FxIndexMap, fx::FxIndexSet};
+use rustc_data_structures::fx::{FxIndexMap, FxIndexSet};
 use rustc_errors::{Diag, LintDiagnostic, MultiSpan};
 use rustc_feature::{Features, GateIssue};
 use rustc_hir::intravisit::{self, Visitor};
@@ -31,7 +31,7 @@ use crate::errors::{
     OverruledAttributeSub, RequestedLevel, UnknownToolInScopedLint, UnsupportedGroup,
 };
 use crate::fluent_generated as fluent;
-use crate::late::{unerased_lint_store, name_without_tool};
+use crate::late::{unerased_lint_store /*name_without_tool*/};
 use crate::lints::{
     DeprecatedLintName, DeprecatedLintNameFromCommandLine, IgnoredUnlessCrateSpecified,
     OverruledAttributeLint, RemovedLint, RemovedLintFromCommandLine, RenamedLint,
@@ -115,10 +115,7 @@ impl LintLevelSets {
     }
 }
 
-pub fn lints_that_dont_need_to_run(
-    tcx: TyCtxt<'_>,
-    (): (),
-) -> FxIndexSet<LintId> {
+pub fn lints_that_dont_need_to_run(tcx: TyCtxt<'_>, (): ()) -> FxIndexSet<LintId> {
     let store = unerased_lint_store(&tcx.sess);
 
     let dont_need_to_run: FxIndexSet<LintId> = store
@@ -394,8 +391,14 @@ impl<'tcx> Visitor<'tcx> for LintLevelMaximum<'tcx> {
 
                 for meta_list in meta_item_list {
                     // Convert Path to String
-                    let Some(meta_item) = meta_list.meta_item() else {return};
-                    let ident: &str = &meta_item.path.segments.iter().map(|segment| segment.ident.as_str()).collect::<Vec<&str>>().join("::");
+                    let Some(meta_item) = meta_list.meta_item() else { return };
+                    let ident: &str = &meta_item
+                        .path
+                        .segments
+                        .iter()
+                        .map(|segment| segment.ident.as_str())
+                        .collect::<Vec<&str>>()
+                        .join("::");
                     let Ok(lints) = store.find_lints(
                         // SAFETY: Lint attributes can only have literals
                         ident,
@@ -430,23 +433,25 @@ impl<'tcx> Visitor<'tcx> for LintLevelMaximum<'tcx> {
                     //             self.dont_need_to_run.swap_remove(&lint);
                     //         }
                     //     }
-                    }
+                }
                 // We handle #![allow]s differently, as these remove checking rather than adding.
             } // Some(Level::Allow) if ast::AttrStyle::Inner == attribute.style => {
-              //     for meta_list in meta.meta_item_list().unwrap() {
-              //         // If it's a tool lint (e.g. clippy::my_clippy_lint)
-              //         if let ast::NestedMetaItem::MetaItem(meta_item) = meta_list {
-              //             if meta_item.path.segments.len() == 1 {
-              //                 self.lints_allowed
-              //                     .insert(meta_list.name_or_empty().as_str().to_string());
-              //             } else {
-              //                 self.lints_allowed
-              //                     .insert(meta_item.path.segments[1].ident.name.as_str().to_string());
-              //             }
-              //         }
-              //     }
-              // }
-              _ => { return; }
+            //     for meta_list in meta.meta_item_list().unwrap() {
+            //         // If it's a tool lint (e.g. clippy::my_clippy_lint)
+            //         if let ast::NestedMetaItem::MetaItem(meta_item) = meta_list {
+            //             if meta_item.path.segments.len() == 1 {
+            //                 self.lints_allowed
+            //                     .insert(meta_list.name_or_empty().as_str().to_string());
+            //             } else {
+            //                 self.lints_allowed
+            //                     .insert(meta_item.path.segments[1].ident.name.as_str().to_string());
+            //             }
+            //         }
+            //     }
+            // }
+            _ => {
+                return;
+            }
         }
     }
 }
