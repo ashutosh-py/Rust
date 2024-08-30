@@ -156,7 +156,6 @@ impl<'tcx> Inliner<'tcx> {
             match self.try_inlining(caller_body, &callsite) {
                 Err(reason) => {
                     debug!("not-inlined {} [{}]", callsite.callee, reason);
-                    continue;
                 }
                 Ok(new_blocks) => {
                     debug!("inlined {}", callsite.callee);
