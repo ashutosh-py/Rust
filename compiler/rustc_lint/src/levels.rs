@@ -115,7 +115,7 @@ impl LintLevelSets {
     }
 }
 
-pub fn lints_that_dont_need_to_run(tcx: TyCtxt<'_>, (): ()) -> FxIndexSet<LintId> {
+fn lints_that_dont_need_to_run(tcx: TyCtxt<'_>, (): ()) -> FxIndexSet<LintId> {
     let store = unerased_lint_store(&tcx.sess);
 
     let dont_need_to_run: FxIndexSet<LintId> = store

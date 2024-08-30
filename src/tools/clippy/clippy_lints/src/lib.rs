@@ -67,7 +67,7 @@ extern crate declare_clippy_lint;
 mod utils;
 
 pub mod ctfe; // VERY important lint (rust#125116)
-mod declared_lints;
+pub mod declared_lints;
 pub mod deprecated_lints;
 
 // begin lints modules, do not remove this comment, it’s used in `update_lints`
