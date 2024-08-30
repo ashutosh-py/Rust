@@ -665,6 +665,19 @@ impl Builder {
 /// println!("{result}");
 /// ```
 ///
+/// # Notes
+///
+/// This function has the same minimal guarantee regarding "foreign" unwinding operations (e.g.
+/// an exception thrown from C++ code, or a `panic!` in Rust code compiled or linked with a
+/// different runtime) as [`catch_unwind`]; namely, if the thread created with `thread::spawn`
+/// unwinds all the way to the root with such an exception, one of two behaviors are possible,
+/// and it is unspecified which will occur:
+///
+/// * The process aborts.
+/// * The process does not abort, and [`join`] will return a `Result::Err`
+///   containing an opaque type.
+///
+/// [`catch_unwind`]: ../../std/panic/fn.catch_unwind.html
 /// [`channels`]: crate::sync::mpsc
 /// [`join`]: JoinHandle::join
 /// [`Err`]: crate::result::Result::Err
@@ -1762,16 +1775,15 @@ impl<T> JoinHandle<T> {
     ///
     /// # Notes
     ///
-    /// This function has the same minimal guarantee regarding "foreign" unwinding operations (e.g.
-    /// an exception thrown from C++ code, or a `panic!` in Rust code compiled or linked with a
-    /// different runtime) as [`catch_unwind`]; namely, if the thread created with `thread::spawn`
-    /// unwinds all the way to the root with such an exception, this function will have one of two
-    /// behaviors, and it is unspecified which will occur:
-    ///
-    /// * The process aborts.
-    /// * The function returns a `Result::Err` containing an opaque type.
+    /// If a "foreign" unwinding operation (e.g. an exception thrown from C++
+    /// code, or a `panic!` in Rust code compiled or linked with a different
+    /// runtime) unwinds all the way to the thread root, the process may be
+    /// aborted; see the Notes on [`thread::spawn`]. If the process is not
+    /// aborted, this function will return a `Result::Err` containing an opaque
+    /// type.
     ///
     /// [`catch_unwind`]: ../../std/panic/fn.catch_unwind.html
+    /// [`thread::spawn`]: spawn
     #[stable(feature = "rust1", since = "1.0.0")]
     pub fn join(self) -> Result<T> {
         self.0.join()
