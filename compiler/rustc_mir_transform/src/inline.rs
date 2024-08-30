@@ -637,7 +637,7 @@ impl<'tcx> Inliner<'tcx> {
             );
             let dest_ty = dest.ty(caller_body, self.tcx);
             let temp =
-                Place::from(self.new_call_temp(caller_body, &callsite, dest_ty, return_block));
+                Place::from(self.new_call_temp(caller_body, callsite, dest_ty, return_block));
             caller_body[callsite.block].statements.push(Statement {
                 source_info: callsite.source_info,
                 kind: StatementKind::Assign(Box::new((temp, dest))),
@@ -656,7 +656,7 @@ impl<'tcx> Inliner<'tcx> {
                 true,
                 self.new_call_temp(
                     caller_body,
-                    &callsite,
+                    callsite,
                     destination.ty(caller_body, self.tcx).ty,
                     return_block,
                 ),
@@ -664,7 +664,7 @@ impl<'tcx> Inliner<'tcx> {
         };
 
         // Copy the arguments if needed.
-        let args = self.make_call_args(args, &callsite, caller_body, &callee_body, return_block);
+        let args = self.make_call_args(args, callsite, caller_body, &callee_body, return_block);
 
         let mut integrator = Integrator {
             args: &args,
