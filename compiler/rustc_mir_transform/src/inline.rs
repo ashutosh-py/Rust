@@ -34,7 +34,7 @@ const TOP_DOWN_DEPTH_LIMIT: usize = 5;
 
 pub(super) struct Inline;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 struct CallSite<'tcx> {
     callee: Instance<'tcx>,
     fn_sig: ty::PolyFnSig<'tcx>,
