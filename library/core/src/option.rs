@@ -568,6 +568,7 @@ use crate::{cmp, convert, hint, mem, slice};
 #[lang = "Option"]
 #[stable(feature = "rust1", since = "1.0.0")]
 #[allow(clippy::derived_hash_with_manual_eq)] // PartialEq is manually implemented equivalently
+#[cfg_attr(not(bootstrap), doc(search_unbox))]
 pub enum Option<T> {
     /// No value.
     #[lang = "None"]

@@ -524,6 +524,7 @@ use crate::{convert, fmt, hint};
 #[must_use = "this `Result` may be an `Err` variant, which should be handled"]
 #[rustc_diagnostic_item = "Result"]
 #[stable(feature = "rust1", since = "1.0.0")]
+#[cfg_attr(not(bootstrap), doc(search_unbox))]
 pub enum Result<T, E> {
     /// Contains the success value
     #[lang = "Ok"]
