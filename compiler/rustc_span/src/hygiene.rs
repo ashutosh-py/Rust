@@ -54,11 +54,21 @@ pub struct SyntaxContext(u32);
 impl !Ord for SyntaxContext {}
 impl !PartialOrd for SyntaxContext {}
 
-#[derive(Debug, Encodable, Decodable, Clone)]
-pub struct SyntaxContextData {
+#[derive(Debug, Encodable, Decodable, Clone, Copy, Hash, PartialEq, Eq)]
+pub struct SyntaxContextKey {
     outer_expn: ExpnId,
     outer_transparency: Transparency,
     parent: SyntaxContext,
+}
+
+impl SyntaxContextKey {
+    fn new(outer_expn: ExpnId, outer_transparency: Transparency, parent: SyntaxContext) -> Self {
+        SyntaxContextKey { outer_expn, outer_transparency, parent }
+    }
+}
+
+#[derive(Debug, Encodable, Decodable, Clone, Copy)]
+pub struct SyntaxContextData {
     /// This context, but with all transparent and semi-transparent expansions filtered away.
     opaque: SyntaxContext,
     /// This context, but with all transparent expansions filtered away.
@@ -332,8 +342,9 @@ pub(crate) struct HygieneData {
     foreign_expn_data: FxHashMap<ExpnId, ExpnData>,
     foreign_expn_hashes: FxHashMap<ExpnId, ExpnHash>,
     expn_hash_to_expn_id: UnhashMap<ExpnHash, ExpnId>,
-    syntax_context_data: Vec<SyntaxContextData>,
-    syntax_context_map: FxHashMap<(SyntaxContext, ExpnId, Transparency), SyntaxContext>,
+    syntax_context_data: Vec<(SyntaxContextKey, SyntaxContextData)>,
+    syntax_context_data_map: FxHashMap<SyntaxContextKey, SyntaxContextData>,
+    syntax_context_map: FxHashMap<SyntaxContextKey, SyntaxContext>,
     /// Maps the `local_hash` of an `ExpnData` to the next disambiguator value.
     /// This is used by `update_disambiguator` to keep track of which `ExpnData`s
     /// would have collisions without a disambiguator.
@@ -359,14 +370,19 @@ impl HygieneData {
             foreign_expn_hashes: FxHashMap::default(),
             expn_hash_to_expn_id: std::iter::once((ExpnHash(Fingerprint::ZERO), ExpnId::root()))
                 .collect(),
-            syntax_context_data: vec![SyntaxContextData {
-                outer_expn: ExpnId::root(),
-                outer_transparency: Transparency::Opaque,
-                parent: SyntaxContext(0),
-                opaque: SyntaxContext(0),
-                opaque_and_semitransparent: SyntaxContext(0),
-                dollar_crate_name: kw::DollarCrate,
-            }],
+            syntax_context_data: vec![(
+                SyntaxContextKey {
+                    outer_expn: ExpnId::root(),
+                    outer_transparency: Transparency::Opaque,
+                    parent: SyntaxContext(0),
+                },
+                SyntaxContextData {
+                    opaque: SyntaxContext(0),
+                    opaque_and_semitransparent: SyntaxContext(0),
+                    dollar_crate_name: kw::DollarCrate,
+                },
+            )],
+            syntax_context_data_map: FxHashMap::default(),
             syntax_context_map: FxHashMap::default(),
             expn_data_disambiguators: UnhashMap::default(),
         }
@@ -416,24 +432,24 @@ impl HygieneData {
     }
 
     fn normalize_to_macros_2_0(&self, ctxt: SyntaxContext) -> SyntaxContext {
-        self.syntax_context_data[ctxt.0 as usize].opaque
+        self.syntax_context_data[ctxt.0 as usize].1.opaque
     }
 
     fn normalize_to_macro_rules(&self, ctxt: SyntaxContext) -> SyntaxContext {
-        self.syntax_context_data[ctxt.0 as usize].opaque_and_semitransparent
+        self.syntax_context_data[ctxt.0 as usize].1.opaque_and_semitransparent
     }
 
     fn outer_expn(&self, ctxt: SyntaxContext) -> ExpnId {
-        self.syntax_context_data[ctxt.0 as usize].outer_expn
+        self.syntax_context_data[ctxt.0 as usize].0.outer_expn
     }
 
     fn outer_mark(&self, ctxt: SyntaxContext) -> (ExpnId, Transparency) {
-        let data = &self.syntax_context_data[ctxt.0 as usize];
+        let data = &self.syntax_context_data[ctxt.0 as usize].0;
         (data.outer_expn, data.outer_transparency)
     }
 
     fn parent_ctxt(&self, ctxt: SyntaxContext) -> SyntaxContext {
-        self.syntax_context_data[ctxt.0 as usize].parent
+        self.syntax_context_data[ctxt.0 as usize].0.parent
     }
 
     fn remove_mark(&self, ctxt: &mut SyntaxContext) -> (ExpnId, Transparency) {
@@ -542,61 +558,55 @@ impl HygieneData {
         transparency: Transparency,
     ) -> SyntaxContext {
         let syntax_context_data = &mut self.syntax_context_data;
-        let mut opaque = syntax_context_data[ctxt.0 as usize].opaque;
+        let mut opaque = syntax_context_data[ctxt.0 as usize].1.opaque;
         let mut opaque_and_semitransparent =
-            syntax_context_data[ctxt.0 as usize].opaque_and_semitransparent;
+            syntax_context_data[ctxt.0 as usize].1.opaque_and_semitransparent;
 
         if transparency >= Transparency::Opaque {
             let parent = opaque;
-            opaque = *self
-                .syntax_context_map
-                .entry((parent, expn_id, transparency))
-                .or_insert_with(|| {
-                    let new_opaque = SyntaxContext(syntax_context_data.len() as u32);
-                    syntax_context_data.push(SyntaxContextData {
-                        outer_expn: expn_id,
-                        outer_transparency: transparency,
-                        parent,
-                        opaque: new_opaque,
-                        opaque_and_semitransparent: new_opaque,
-                        dollar_crate_name: kw::DollarCrate,
-                    });
-                    new_opaque
-                });
+            let key = SyntaxContextKey::new(expn_id, transparency, parent);
+            opaque = *self.syntax_context_map.entry(key).or_insert_with(|| {
+                let new_opaque = SyntaxContext(syntax_context_data.len() as u32);
+                let data = SyntaxContextData {
+                    opaque: new_opaque,
+                    opaque_and_semitransparent: new_opaque,
+                    dollar_crate_name: kw::DollarCrate,
+                };
+                syntax_context_data.push((key, data));
+                self.syntax_context_data_map.insert(key, data);
+                new_opaque
+            });
         }
 
         if transparency >= Transparency::SemiTransparent {
             let parent = opaque_and_semitransparent;
-            opaque_and_semitransparent = *self
-                .syntax_context_map
-                .entry((parent, expn_id, transparency))
-                .or_insert_with(|| {
-                    let new_opaque_and_semitransparent =
-                        SyntaxContext(syntax_context_data.len() as u32);
-                    syntax_context_data.push(SyntaxContextData {
-                        outer_expn: expn_id,
-                        outer_transparency: transparency,
-                        parent,
-                        opaque,
-                        opaque_and_semitransparent: new_opaque_and_semitransparent,
-                        dollar_crate_name: kw::DollarCrate,
-                    });
-                    new_opaque_and_semitransparent
-                });
+            let key = SyntaxContextKey::new(expn_id, transparency, parent);
+            opaque_and_semitransparent = *self.syntax_context_map.entry(key).or_insert_with(|| {
+                let new_opaque_and_semitransparent =
+                    SyntaxContext(syntax_context_data.len() as u32);
+                let data = SyntaxContextData {
+                    opaque,
+                    opaque_and_semitransparent: new_opaque_and_semitransparent,
+                    dollar_crate_name: kw::DollarCrate,
+                };
+                syntax_context_data.push((key, data));
+                self.syntax_context_data_map.insert(key, data);
+                new_opaque_and_semitransparent
+            });
         }
 
         let parent = ctxt;
-        *self.syntax_context_map.entry((parent, expn_id, transparency)).or_insert_with(|| {
+        let key = SyntaxContextKey::new(expn_id, transparency, parent);
+        *self.syntax_context_map.entry(key).or_insert_with(|| {
             let new_opaque_and_semitransparent_and_transparent =
                 SyntaxContext(syntax_context_data.len() as u32);
-            syntax_context_data.push(SyntaxContextData {
-                outer_expn: expn_id,
-                outer_transparency: transparency,
-                parent,
+            let data = SyntaxContextData {
                 opaque,
                 opaque_and_semitransparent,
                 dollar_crate_name: kw::DollarCrate,
-            });
+            };
+            syntax_context_data.push((key, data));
+            self.syntax_context_data_map.insert(key, data);
             new_opaque_and_semitransparent_and_transparent
         })
     }
@@ -623,7 +633,7 @@ pub fn update_dollar_crate_names(mut get_name: impl FnMut(SyntaxContext) -> Symb
             data.syntax_context_data
                 .iter()
                 .rev()
-                .take_while(|scdata| scdata.dollar_crate_name == kw::DollarCrate)
+                .take_while(|scdata| scdata.1.dollar_crate_name == kw::DollarCrate)
                 .count(),
         )
     });
@@ -634,7 +644,7 @@ pub fn update_dollar_crate_names(mut get_name: impl FnMut(SyntaxContext) -> Symb
         range_to_update.clone().map(|idx| get_name(SyntaxContext::from_u32(idx as u32))).collect();
     HygieneData::with(|data| {
         range_to_update.zip(names).for_each(|(idx, name)| {
-            data.syntax_context_data[idx].dollar_crate_name = name;
+            data.syntax_context_data[idx].1.dollar_crate_name = name;
         })
     })
 }
@@ -670,7 +680,7 @@ pub fn debug_hygiene_data(verbose: bool) -> String {
             data.syntax_context_data.iter().enumerate().for_each(|(id, ctxt)| {
                 s.push_str(&format!(
                     "\n#{}: parent: {:?}, outer_mark: ({:?}, {:?})",
-                    id, ctxt.parent, ctxt.outer_expn, ctxt.outer_transparency,
+                    id, ctxt.0.parent, ctxt.0.outer_expn, ctxt.0.outer_transparency,
                 ));
             });
             s
@@ -884,7 +894,7 @@ impl SyntaxContext {
     }
 
     pub(crate) fn dollar_crate_name(self) -> Symbol {
-        HygieneData::with(|data| data.syntax_context_data[self.0 as usize].dollar_crate_name)
+        HygieneData::with(|data| data.syntax_context_data[self.0 as usize].1.dollar_crate_name)
     }
 
     pub fn edition(self) -> Edition {
@@ -1210,7 +1220,7 @@ impl HygieneEncodeContext {
     pub fn encode<T>(
         &self,
         encoder: &mut T,
-        mut encode_ctxt: impl FnMut(&mut T, u32, &SyntaxContextData),
+        mut encode_ctxt: impl FnMut(&mut T, u32, &(SyntaxContextKey, SyntaxContextData)),
         mut encode_expn: impl FnMut(&mut T, ExpnId, &ExpnData, ExpnHash),
     ) {
         // When we serialize a `SyntaxContextData`, we may end up serializing
@@ -1342,10 +1352,15 @@ pub fn decode_expn_id(
 // to track which `SyntaxContext`s we have already decoded.
 // The provided closure will be invoked to deserialize a `SyntaxContextData`
 // if we haven't already seen the id of the `SyntaxContext` we are deserializing.
-pub fn decode_syntax_context<D: Decoder, F: FnOnce(&mut D, u32) -> SyntaxContextData>(
+pub fn decode_syntax_context<
+    D: Decoder,
+    F0: FnOnce(&mut D, u32) -> SyntaxContextKey,
+    F1: FnOnce(&mut D, u32) -> SyntaxContextData,
+>(
     d: &mut D,
     context: &HygieneDecodeContext,
-    decode_data: F,
+    decode_ctxt_key: F0,
+    decode_ctxt_data: F1,
 ) -> SyntaxContext {
     let raw_id: u32 = Decodable::decode(d);
     if raw_id == 0 {
@@ -1387,16 +1402,20 @@ pub fn decode_syntax_context<D: Decoder, F: FnOnce(&mut D, u32) -> SyntaxContext
                 // as the SyntaxContextData may reference itself.
                 let new_ctxt = HygieneData::with(|hygiene_data| {
                     let new_ctxt = SyntaxContext(hygiene_data.syntax_context_data.len() as u32);
-                    // Push a dummy SyntaxContextData to ensure that nobody else can get the
-                    // same ID as us. This will be overwritten after call `decode_Data`
-                    hygiene_data.syntax_context_data.push(SyntaxContextData {
-                        outer_expn: ExpnId::root(),
-                        outer_transparency: Transparency::Transparent,
-                        parent: SyntaxContext::root(),
-                        opaque: SyntaxContext::root(),
-                        opaque_and_semitransparent: SyntaxContext::root(),
-                        dollar_crate_name: kw::Empty,
-                    });
+                    // Push a dummy data to ensure that nobody else can get the
+                    // same ID as us. `SyntaxContextKey` will be overwritten after call `decode_Data`
+                    hygiene_data.syntax_context_data.push((
+                        SyntaxContextKey {
+                            outer_expn: ExpnId::root(),
+                            outer_transparency: Transparency::Transparent,
+                            parent: SyntaxContext::root(),
+                        },
+                        SyntaxContextData {
+                            opaque: SyntaxContext::root(),
+                            opaque_and_semitransparent: SyntaxContext::root(),
+                            dollar_crate_name: kw::Empty,
+                        },
+                    ));
                     new_ctxt
                 });
                 entry.insert(new_ctxt);
@@ -1407,25 +1426,17 @@ pub fn decode_syntax_context<D: Decoder, F: FnOnce(&mut D, u32) -> SyntaxContext
 
     // Don't try to decode data while holding the lock, since we need to
     // be able to recursively decode a SyntaxContext
-    let mut ctxt_data = decode_data(d, raw_id);
-    // Reset `dollar_crate_name` so that it will be updated by `update_dollar_crate_names`
-    // We don't care what the encoding crate set this to - we want to resolve it
-    // from the perspective of the current compilation session
-    ctxt_data.dollar_crate_name = kw::DollarCrate;
+    let ctxt_key = decode_ctxt_key(d, raw_id);
+    let ctxt_data = HygieneData::with(|hygiene_data| {
+        hygiene_data.syntax_context_data_map.get(&ctxt_key).copied()
+    })
+    .unwrap_or_else(|| decode_ctxt_data(d, raw_id));
 
     // Overwrite the dummy data with our decoded SyntaxContextData
     HygieneData::with(|hygiene_data| {
-        if let Some(old) = hygiene_data.syntax_context_data.get(raw_id as usize)
-            && old.outer_expn == ctxt_data.outer_expn
-            && old.outer_transparency == ctxt_data.outer_transparency
-            && old.parent == ctxt_data.parent
-        {
-            ctxt_data = old.clone();
-        }
-
         let dummy = std::mem::replace(
             &mut hygiene_data.syntax_context_data[ctxt.as_u32() as usize],
-            ctxt_data,
+            (ctxt_key, ctxt_data),
         );
         if cfg!(not(parallel_compiler)) {
             // Make sure nothing weird happened while `decode_data` was running.
@@ -1433,7 +1444,7 @@ pub fn decode_syntax_context<D: Decoder, F: FnOnce(&mut D, u32) -> SyntaxContext
             // modifying the dummy entry.
             // This does not hold for the parallel compiler as another thread may
             // have inserted the fully decoded data.
-            assert_eq!(dummy.dollar_crate_name, kw::Empty);
+            assert_eq!(dummy.1.dollar_crate_name, kw::Empty);
         }
     });
 
@@ -1452,7 +1463,7 @@ pub fn decode_syntax_context<D: Decoder, F: FnOnce(&mut D, u32) -> SyntaxContext
     ctxt
 }
 
-fn for_all_ctxts_in<F: FnMut(u32, SyntaxContext, &SyntaxContextData)>(
+fn for_all_ctxts_in<F: FnMut(u32, SyntaxContext, &(SyntaxContextKey, SyntaxContextData))>(
     ctxts: impl Iterator<Item = SyntaxContext>,
     mut f: F,
 ) {
