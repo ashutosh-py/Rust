@@ -3,13 +3,17 @@ use std::mem::swap;
 use rustc_ast::UnOp;
 use rustc_hir::def::Res;
 use rustc_hir::intravisit::{self, Visitor};
-use rustc_hir::{self as hir, Block, Expr, ExprKind, LetStmt, Pat, PatKind, QPath, StmtKind};
+use rustc_hir::{
+    self as hir, Block, Expr, ExprKind, HirIdMap, HirIdSet, LetStmt, Pat, PatKind, QPath, StmtKind,
+};
 use rustc_macros::LintDiagnostic;
-use rustc_middle::ty;
+use rustc_middle::hir::place::PlaceBase;
+use rustc_middle::ty::{self, Ty};
 use rustc_session::lint::FutureIncompatibilityReason;
 use rustc_session::{declare_lint, declare_lint_pass};
 use rustc_span::edition::Edition;
 use rustc_span::Span;
+use tracing::instrument;
 
 use crate::{LateContext, LateLintPass};
 
@@ -94,35 +98,41 @@ declare_lint! {
 declare_lint_pass!(TailExprDropOrder => [TAIL_EXPR_DROP_ORDER]);
 
 impl TailExprDropOrder {
+    #[instrument(level = "debug", skip(cx, body))]
     fn check_fn_or_closure<'tcx>(
         cx: &LateContext<'tcx>,
         fn_kind: hir::intravisit::FnKind<'tcx>,
         body: &'tcx hir::Body<'tcx>,
         def_id: rustc_span::def_id::LocalDefId,
     ) {
-        let mut locals = vec![];
+        let consumed = cx.tcx.extract_tail_expr_consuming_nodes(def_id.to_def_id());
+        let mut locals = HirIdMap::default();
         if matches!(fn_kind, hir::intravisit::FnKind::Closure) {
             for &capture in cx.tcx.closure_captures(def_id) {
                 if matches!(capture.info.capture_kind, ty::UpvarCapture::ByValue)
                     && capture.place.ty().has_significant_drop(cx.tcx, cx.param_env)
                 {
-                    locals.push(capture.var_ident.span);
+                    let hir_id = match capture.place.base {
+                        PlaceBase::Local(id) => id,
+                        PlaceBase::Upvar(upvar) => upvar.var_path.hir_id,
+                        PlaceBase::Rvalue | PlaceBase::StaticItem => continue,
+                    };
+                    if consumed.contains(&hir_id) {
+                        continue;
+                    }
+                    locals.insert(hir_id, capture.var_ident.span);
                 }
             }
         }
         for param in body.params {
-            if cx
-                .typeck_results()
-                .node_type(param.hir_id)
-                .has_significant_drop(cx.tcx, cx.param_env)
-            {
-                locals.push(param.span);
-            }
+            LocalCollector { cx, locals: &mut locals, consumed: &consumed }.visit_pat(param.pat);
         }
         if let hir::ExprKind::Block(block, _) = body.value.kind {
-            LintVisitor { cx, locals }.check_block_inner(block);
+            LintVisitor { cx, locals, consumed }.check_block_inner(block);
         } else {
-            LintTailExpr { cx, locals: &locals, is_root_tail_expr: true }.visit_expr(body.value);
+            let locals: Vec<_> = locals.values().copied().collect();
+            LintTailExpr { cx, locals: &locals, consumed, is_root_tail_expr: true }
+                .visit_expr(body.value);
         }
     }
 }
@@ -146,21 +156,26 @@ impl<'tcx> LateLintPass<'tcx> for TailExprDropOrder {
 struct LintVisitor<'tcx, 'a> {
     cx: &'a LateContext<'tcx>,
     // We only record locals that have significant drops
-    locals: Vec<Span>,
+    locals: HirIdMap<Span>,
+    consumed: &'a HirIdSet,
 }
 
 struct LocalCollector<'tcx, 'a> {
     cx: &'a LateContext<'tcx>,
-    locals: &'a mut Vec<Span>,
+    locals: &'a mut HirIdMap<Span>,
+    consumed: &'a HirIdSet,
 }
 
 impl<'tcx, 'a> Visitor<'tcx> for LocalCollector<'tcx, 'a> {
     type Result = ();
     fn visit_pat(&mut self, pat: &'tcx Pat<'tcx>) {
         if let PatKind::Binding(_binding_mode, id, ident, pat) = pat.kind {
+            if self.consumed.contains(&id) {
+                return;
+            }
             let ty = self.cx.typeck_results().node_type(id);
             if ty.has_significant_drop(self.cx.tcx, self.cx.param_env) {
-                self.locals.push(ident.span);
+                self.locals.insert(id, ident.span);
             }
             if let Some(pat) = pat {
                 self.visit_pat(pat);
@@ -179,7 +194,8 @@ impl<'tcx, 'a> Visitor<'tcx> for LintVisitor<'tcx, 'a> {
         swap(&mut locals, &mut self.locals);
     }
     fn visit_local(&mut self, local: &'tcx LetStmt<'tcx>) {
-        LocalCollector { cx: self.cx, locals: &mut self.locals }.visit_local(local);
+        LocalCollector { cx: self.cx, locals: &mut self.locals, consumed: &self.consumed }
+            .visit_local(local);
     }
 }
 
@@ -200,8 +216,14 @@ impl<'tcx, 'a> LintVisitor<'tcx, 'a> {
         if self.locals.is_empty() {
             return;
         }
-        LintTailExpr { cx: self.cx, locals: &self.locals, is_root_tail_expr: true }
-            .visit_expr(tail_expr);
+        let locals: Vec<_> = self.locals.values().copied().collect();
+        LintTailExpr {
+            cx: self.cx,
+            locals: &locals,
+            is_root_tail_expr: true,
+            consumed: self.consumed,
+        }
+        .visit_expr(tail_expr);
     }
 }
 
@@ -209,10 +231,11 @@ struct LintTailExpr<'tcx, 'a> {
     cx: &'a LateContext<'tcx>,
     is_root_tail_expr: bool,
     locals: &'a [Span],
+    consumed: &'a HirIdSet,
 }
 
 impl<'tcx, 'a> LintTailExpr<'tcx, 'a> {
-    fn expr_eventually_point_into_local(mut expr: &Expr<'tcx>) -> bool {
+    fn expr_eventually_point_into_local(&self, mut expr: &Expr<'tcx>) -> bool {
         loop {
             match expr.kind {
                 ExprKind::Index(access, _, _) | ExprKind::Field(access, _) => expr = access,
@@ -231,11 +254,15 @@ impl<'tcx, 'a> LintTailExpr<'tcx, 'a> {
         }
     }
 
-    fn expr_generates_nonlocal_droppy_value(&self, expr: &Expr<'tcx>) -> bool {
-        if Self::expr_eventually_point_into_local(expr) {
-            return false;
+    fn expr_generates_nonlocal_droppy_value(&self, expr: &Expr<'tcx>) -> Option<Ty<'tcx>> {
+        if self.expr_eventually_point_into_local(expr) {
+            return None;
         }
-        self.cx.typeck_results().expr_ty(expr).has_significant_drop(self.cx.tcx, self.cx.param_env)
+        if self.consumed.contains(&expr.hir_id) {
+            return None;
+        }
+        let ty = self.cx.typeck_results().expr_ty(expr);
+        if ty.has_significant_drop(self.cx.tcx, self.cx.param_env) { Some(ty) } else { None }
     }
 }
 
@@ -243,12 +270,12 @@ impl<'tcx, 'a> Visitor<'tcx> for LintTailExpr<'tcx, 'a> {
     fn visit_expr(&mut self, expr: &'tcx Expr<'tcx>) {
         if self.is_root_tail_expr {
             self.is_root_tail_expr = false;
-        } else if self.expr_generates_nonlocal_droppy_value(expr) {
+        } else if let Some(ty) = self.expr_generates_nonlocal_droppy_value(expr) {
             self.cx.tcx.emit_node_span_lint(
                 TAIL_EXPR_DROP_ORDER,
                 expr.hir_id,
                 expr.span,
-                TailExprDropOrderLint { spans: self.locals.to_vec() },
+                TailExprDropOrderLint { spans: self.locals.to_vec(), ty },
             );
             return;
         }
@@ -294,13 +321,15 @@ impl<'tcx, 'a> Visitor<'tcx> for LintTailExpr<'tcx, 'a> {
         }
     }
     fn visit_block(&mut self, block: &'tcx Block<'tcx>) {
-        LintVisitor { cx: self.cx, locals: <_>::default() }.check_block_inner(block);
+        LintVisitor { cx: self.cx, locals: <_>::default(), consumed: &<_>::default() }
+            .check_block_inner(block);
     }
 }
 
 #[derive(LintDiagnostic)]
 #[diag(lint_tail_expr_drop_order)]
-struct TailExprDropOrderLint {
+struct TailExprDropOrderLint<'a> {
     #[label]
     pub spans: Vec<Span>,
+    pub ty: Ty<'a>,
 }
