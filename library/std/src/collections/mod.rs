@@ -79,34 +79,50 @@
 //! see each type's documentation, and note that the names of actual methods may
 //! differ from the tables below on certain collections.
 //!
-//! Throughout the documentation, we will follow a few conventions. For all
-//! operations, the collection's size is denoted by n. If another collection is
-//! involved in the operation, it contains m elements. Operations which have an
-//! *amortized* cost are suffixed with a `*`. Operations with an *expected*
-//! cost are suffixed with a `~`.
+//! ## Conventions
+//! Throughout the documentation, we will adhere to the following conventions for 
+//! operation notation: 
 //!
-//! All amortized costs are for the potential need to resize when capacity is
-//! exhausted. If a resize occurs it will take *O*(*n*) time. Our collections never
-//! automatically shrink, so removal operations aren't amortized. Over a
-//! sufficiently large series of operations, the average cost per operation will
-//! deterministically equal the given cost.
+//! * The collection's size is denoted by `n`.
+//! * If a second collection is involved, it's size is denoted by `m`. 
+//! * Item indices are denoted by `i`.
+//! * Operations which have an *amortized* cost are suffixed with a `*`. 
+//! * Operations with an *expected* cost are suffixed with a `~`.
 //!
-//! Only [`HashMap`] has expected costs, due to the probabilistic nature of hashing.
-//! It is theoretically possible, though very unlikely, for [`HashMap`] to
-//! experience worse performance.
+//! ### Amortized Costs
 //!
-//! ## Sequences
+//! Calling operations that add to a collection will occasionally require a
+//! collection to be resized - an extra operation that takes *O*(*n*) time.
 //!
-//! |                | get(i)                 | insert(i)               | remove(i)              | append    | split_off(i)           |
-//! |----------------|------------------------|-------------------------|------------------------|-----------|------------------------|
-//! | [`Vec`]        | *O*(1)                 | *O*(*n*-*i*)*           | *O*(*n*-*i*)           | *O*(*m*)* | *O*(*n*-*i*)           |
-//! | [`VecDeque`]   | *O*(1)                 | *O*(min(*i*, *n*-*i*))* | *O*(min(*i*, *n*-*i*)) | *O*(*m*)* | *O*(min(*i*, *n*-*i*)) |
-//! | [`LinkedList`] | *O*(min(*i*, *n*-*i*)) | *O*(min(*i*, *n*-*i*))  | *O*(min(*i*, *n*-*i*)) | *O*(1)    | *O*(min(*i*, *n*-*i*)) |
+//! Amortized costs are calculated to account for the time cost of this resize
+//! *over a sufficiently large series of operations*. An individual operation
+//! may be slower or faster due to the sporadic nature of collection resizing,
+//! however the average cost per operation will eventually equal the amortized
+//! cost.
+//!
+//! Rust's collections never automatically shrink, so removal operations aren't
+//! amortized.
+//!
+//! ### Expected Costs
+//!
+//! [`HashMap`] uses expected costs to denote that it is theoretically possible,
+//! though very unlikely, for [`HashMap`] to experience worse performance than
+//! the expected cost. This is due to the probablilistic nature of hashing -
+//! i.e. it is possible to generate a duplicate hash given some input key that
+//! requires extra computation to correct, but exceptionally unlikely.
+//!
+//! ## Cost of Sequence Operations
+//!
+//! |                | get(i)                 | insert(i)               | remove(i)              | append(Vec(m))    | split_off(i)           |
+//! |----------------|------------------------|-------------------------|------------------------|-------------------|------------------------|
+//! | [`Vec`]        | *O*(1)                 | *O*(*n*-*i*)*           | *O*(*n*-*i*)           | *O*(*m*)*         | *O*(*n*-*i*)           |
+//! | [`VecDeque`]   | *O*(1)                 | *O*(min(*i*, *n*-*i*))* | *O*(min(*i*, *n*-*i*)) | *O*(*m*)*         | *O*(min(*i*, *n*-*i*)) |
+//! | [`LinkedList`] | *O*(min(*i*, *n*-*i*)) | *O*(min(*i*, *n*-*i*))  | *O*(min(*i*, *n*-*i*)) | *O*(1)            | *O*(min(*i*, *n*-*i*)) |
 //!
 //! Note that where ties occur, [`Vec`] is generally going to be faster than [`VecDeque`], and
 //! [`VecDeque`] is generally going to be faster than [`LinkedList`].
 //!
-//! ## Maps
+//! ## Cost of Map Operations
 //!
 //! For Sets, all operations have the cost of the equivalent Map operation.
 //!
