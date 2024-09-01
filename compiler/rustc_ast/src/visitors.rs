@@ -261,7 +261,6 @@ macro_rules! mut_only_visit {
 
 mut_only_visit! {visit_lazy_tts}
 mut_only_visit! {walk_ty_alias_where_clauses}
-mut_only_visit! {visit_constness}
 mut_only_visit! {visit_delim_args}
 
 macro_rules! return_result {
@@ -379,6 +378,7 @@ macro_rules! make_ast_visitor {
             make_visit!{Defaultness, visit_defaultness, walk_defaultness}
             make_visit!{Safety, visit_safety, walk_safety}
             make_visit!{ImplPolarity, visit_polarity, walk_polarity}
+            make_visit!{Const, visit_constness, walk_constness}
             make_visit!{Option<P<QSelf>>, visit_qself, walk_qself}
             // TODO: Remove P! on implementers
             make_visit!{P!(Pat), visit_pat, walk_pat}
@@ -1273,7 +1273,7 @@ macro_rules! make_ast_visitor {
             header: ref_t!(FnHeader)
         ) -> result!(V) {
             let FnHeader { safety, coroutine_kind, constness, ext: _ } = header;
-            visit_constness!(vis, constness);
+            try_v!(vis.visit_constness(constness));
             visit_o!(coroutine_kind, |ck| vis.visit_coroutine_kind(ck));
             try_v!(vis.visit_safety(safety));
             return_result!(V)
@@ -1390,7 +1390,7 @@ macro_rules! make_ast_visitor {
                     fn_decl_span,
                     fn_arg_span,
                 }) => {
-                    visit_constness!(vis, constness);
+                    try_v!(vis.visit_constness(constness));
                     try_v!(vis.visit_capture_by(capture_clause));
                     try_v!(vis.visit_fn(FnKind::Closure(binder, coroutine_kind, fn_decl, body), *span, *id));
                     try_v!(visit_span!(vis, fn_decl_span));
@@ -1543,6 +1543,19 @@ macro_rules! make_ast_visitor {
                 ImplPolarity::Negative(span) => {
                     try_v!(visit_span!(vis, span));
                 }
+            }
+            return_result!(V)
+        }
+
+        pub fn walk_constness<$($lt,)? V: $trait$(<$lt>)?>(
+            vis: &mut V,
+            constness: ref_t!(Const)
+        ) -> result!(V) {
+            match constness {
+                Const::Yes(span) => {
+                    try_v!(visit_span!(vis, span));
+                }
+                Const::No => {}
             }
             return_result!(V)
         }
@@ -1745,7 +1758,7 @@ macro_rules! make_ast_visitor {
                         try_v!(visitor.visit_defaultness(defaultness));
                         try_v!(visitor.visit_safety(safety));
                         try_v!(visitor.visit_generics(generics));
-                        visit_constness!(visitor, constness);
+                        try_v!(visitor.visit_constness(constness));
                         try_v!(visitor.visit_polarity(polarity));
                         visit_o!(of_trait, |trait_ref| visitor.visit_trait_ref(trait_ref));
                         try_v!(visitor.visit_ty(self_ty));
@@ -2212,14 +2225,6 @@ pub mod mut_visit {
             }
             token::NtPath(path) => vis.visit_path(path, DUMMY_NODE_ID),
             token::NtVis(visib) => vis.visit_vis(visib),
-        }
-    }
-
-    // No `noop_` prefix because there isn't a corresponding method in `MutVisitor`.
-    fn visit_constness<T: MutVisitor>(vis: &mut T, constness: &mut Const) {
-        match constness {
-            Const::Yes(span) => vis.visit_span(span),
-            Const::No => {}
         }
     }
 
