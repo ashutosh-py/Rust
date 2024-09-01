@@ -1260,25 +1260,42 @@ impl InvocationCollectorNode for P<ast::Item> {
         res
     }
     fn declared_names(&self) -> Vec<Ident> {
-        if let ItemKind::Use(ut) = &self.kind {
-            fn collect_use_tree_leaves(ut: &ast::UseTree, idents: &mut Vec<Ident>) {
-                match &ut.kind {
-                    ast::UseTreeKind::Glob => {}
-                    ast::UseTreeKind::Simple(_) => idents.push(ut.ident()),
-                    ast::UseTreeKind::Nested { items, .. } => {
-                        for (ut, _) in items {
-                            collect_use_tree_leaves(ut, idents);
+        struct ItemNameVisitor(Vec<Ident>, u8);
+        impl Visitor<'_> for ItemNameVisitor {
+            fn visit_item(&mut self, i: &ast::Item) {
+                self.1 += 1;
+                if let ItemKind::Use(ut) = &i.kind {
+                    fn collect_use_tree_leaves(ut: &ast::UseTree, idents: &mut Vec<Ident>) {
+                        match &ut.kind {
+                            ast::UseTreeKind::Glob => {}
+                            ast::UseTreeKind::Simple(_) => idents.push(ut.ident()),
+                            ast::UseTreeKind::Nested { items, .. } => {
+                                for (ut, _) in items {
+                                    collect_use_tree_leaves(ut, idents);
+                                }
+                            }
                         }
                     }
-                }
-            }
 
-            let mut idents = Vec::new();
-            collect_use_tree_leaves(ut, &mut idents);
-            return idents;
+                    collect_use_tree_leaves(ut, &mut self.0);
+                } else {
+                    self.0.push(i.ident);
+                }
+                if self.1 < 4 {
+                    // We only visit up to 3 levels of nesting from this item, like if we were
+                    // looking at `mod a`, we'd find item `a::b::c`. We have this limit to guard
+                    // against deeply nested modules behind `cfg` flags, where we could spend
+                    // significant time collecting this information purely for a potential
+                    // diagnostic improvement.
+                    visit::walk_item(self, i);
+                }
+                self.1 -= 1;
+            }
         }
 
-        vec![self.ident]
+        let mut v = ItemNameVisitor(vec![], 0);
+        v.visit_item(self);
+        v.0
     }
 }
 

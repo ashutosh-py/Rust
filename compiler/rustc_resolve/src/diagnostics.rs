@@ -813,11 +813,15 @@ impl<'a, 'tcx> Resolver<'a, 'tcx> {
                     err.multipart_suggestion(msg, suggestions, applicability);
                 }
 
-                if let Some(ModuleOrUniformRoot::Module(module)) = module
-                    && let Some(module) = module.opt_def_id()
-                    && let Some(segment) = segment
-                {
-                    self.find_cfg_stripped(&mut err, &segment, module);
+                if let Some(segment) = segment {
+                    if let Some(ModuleOrUniformRoot::Module(module)) = module {
+                        let module =
+                            module.opt_def_id().unwrap_or_else(|| CRATE_DEF_ID.to_def_id());
+                        self.find_cfg_stripped(&mut err, &segment, module);
+                    } else {
+                        let module = CRATE_DEF_ID.to_def_id();
+                        self.find_cfg_stripped(&mut err, &segment, module);
+                    }
                 }
 
                 err
