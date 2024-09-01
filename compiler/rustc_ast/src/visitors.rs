@@ -260,7 +260,6 @@ macro_rules! mut_only_visit {
 }
 
 mut_only_visit! {visit_lazy_tts}
-mut_only_visit! {visit_safety}
 mut_only_visit! {walk_ty_alias_where_clauses}
 mut_only_visit! {visit_constness}
 mut_only_visit! {visit_polarity}
@@ -379,6 +378,7 @@ macro_rules! make_ast_visitor {
             make_visit!{FnHeader, visit_fn_header, walk_fn_header}
             make_visit!{Ident, visit_ident, walk_ident}
             make_visit!{Defaultness, visit_defaultness, walk_defaultness}
+            make_visit!{Safety, visit_safety, walk_safety}
             make_visit!{Option<P<QSelf>>, visit_qself, walk_qself}
             // TODO: Remove P! on implementers
             make_visit!{P!(Pat), visit_pat, walk_pat}
@@ -1100,7 +1100,7 @@ macro_rules! make_ast_visitor {
                 }
                 TyKind::BareFn(bft) => {
                     let BareFnTy { safety, ext: _, generic_params, decl, decl_span } = & $($mut)? **bft;
-                    visit_safety!(vis, safety);
+                    try_v!(vis.visit_safety(safety));
                     visit_list!(vis, visit_generic_param, flat_map_generic_param, generic_params);
                     try_v!(vis.visit_fn_decl(decl));
                     try_v!(visit_span!(vis, decl_span));
@@ -1230,7 +1230,7 @@ macro_rules! make_ast_visitor {
             foreign_mod: ref_t!(ForeignMod)
         ) -> result!(V) {
             let ForeignMod { safety, abi: _, items } = foreign_mod;
-            visit_safety!(vis, safety);
+            try_v!(vis.visit_safety(safety));
             visit_list!(vis, visit_foreign_item, flat_map_foreign_item, items);
             return_result!(V)
         }
@@ -1246,7 +1246,7 @@ macro_rules! make_ast_visitor {
                         item: AttrItem { unsafety, path, args, tokens },
                         tokens: attr_tokens,
                     } = &$($mut)? **normal;
-                    visit_safety!(vis, unsafety);
+                    try_v!(vis.visit_safety(unsafety));
                     try_v!(vis.visit_path(path, DUMMY_NODE_ID));
                     try_v!(walk_attr_args(vis, args));
                     visit_lazy_tts!(vis, tokens);
@@ -1275,7 +1275,7 @@ macro_rules! make_ast_visitor {
             let FnHeader { safety, coroutine_kind, constness, ext: _ } = header;
             visit_constness!(vis, constness);
             visit_o!(coroutine_kind, |ck| vis.visit_coroutine_kind(ck));
-            visit_safety!(vis, safety);
+            try_v!(vis.visit_safety(safety));
             return_result!(V)
         }
 
@@ -1520,6 +1520,20 @@ macro_rules! make_ast_visitor {
             return_result!(V)
         }
 
+        pub fn walk_safety<$($lt,)? V: $trait$(<$lt>)?>(
+            vis: &mut V,
+            safety: ref_t!(Safety)
+        ) -> result!(V) {
+            match safety {
+                Safety::Unsafe(span)
+                | Safety::Safe(span) => {
+                    try_v!(visit_span!(vis, span))
+                }
+                Safety::Default => {}
+            }
+            return_result!(V)
+        }
+
         pub fn walk_item<$($lt,)? V: $trait$(<$lt>)?>(
             visitor: &mut V,
             item: ref_t!(P!(Item<impl WalkItemKind>)),
@@ -1647,7 +1661,7 @@ macro_rules! make_ast_visitor {
                         try_v!(visitor.visit_use_tree(use_tree, id, false));
                     }
                     ItemKind::Static(box StaticItem { safety, mutability: _, ty, expr }) => {
-                        visit_safety!(visitor, safety);
+                        try_v!(visitor.visit_safety(safety));
                         try_v!(visitor.visit_ty(ty));
                         visit_o!(expr, |expr| visitor.visit_expr(expr));
                     }
@@ -1663,7 +1677,7 @@ macro_rules! make_ast_visitor {
                         try_v!(visitor.visit_fn(kind, span, id));
                     }
                     ItemKind::Mod(safety, mod_kind) => {
-                        visit_safety!(visitor, safety);
+                        try_v!(visitor.visit_safety(safety));
                         match mod_kind {
                             ModKind::Loaded(
                                 items,
@@ -1716,7 +1730,7 @@ macro_rules! make_ast_visitor {
                         items,
                     }) => {
                         try_v!(visitor.visit_defaultness(defaultness));
-                        visit_safety!(visitor, safety);
+                        try_v!(visitor.visit_safety(safety));
                         try_v!(visitor.visit_generics(generics));
                         visit_constness!(visitor, constness);
                         visit_polarity!(visitor, polarity);
@@ -1725,7 +1739,7 @@ macro_rules! make_ast_visitor {
                         visit_list!(visitor, visit_assoc_item, flat_map_assoc_item, items; AssocCtxt::Impl);
                     }
                     ItemKind::Trait(box Trait { safety, is_auto: _, generics, bounds, items }) => {
-                        visit_safety!(visitor, safety);
+                        try_v!(visitor.visit_safety(safety));
                         try_v!(visitor.visit_generics(generics));
                         visit_list!(visitor, visit_param_bound, bounds; BoundKind::Bound);
                         visit_list!(visitor, visit_assoc_item, flat_map_assoc_item, items; AssocCtxt::Trait);
@@ -1781,7 +1795,7 @@ macro_rules! make_ast_visitor {
             ) -> result!(V) {
                 match self {
                     ForeignItemKind::Static(box StaticItem { safety, ty, mutability: _, expr }) => {
-                        visit_safety!(visitor, safety);
+                        try_v!(visitor.visit_safety(safety));
                         try_v!(visitor.visit_ty(ty));
                         visit_o!(expr, |expr| visitor.visit_expr(expr));
                     }
@@ -2185,15 +2199,6 @@ pub mod mut_visit {
             }
             token::NtPath(path) => vis.visit_path(path, DUMMY_NODE_ID),
             token::NtVis(visib) => vis.visit_vis(visib),
-        }
-    }
-
-    // No `noop_` prefix because there isn't a corresponding method in `MutVisitor`.
-    fn visit_safety<T: MutVisitor>(vis: &mut T, safety: &mut Safety) {
-        match safety {
-            Safety::Unsafe(span) => vis.visit_span(span),
-            Safety::Safe(span) => vis.visit_span(span),
-            Safety::Default => {}
         }
     }
 
