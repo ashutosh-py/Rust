@@ -1,67 +1,11 @@
-error: fn_abi_of(pass_zst) = FnAbi {
-           args: [
-               ArgAbi {
-                   layout: TyAndLayout {
-                       ty: (),
-                       layout: Layout {
-                           size: Size(0 bytes),
-                           align: AbiAndPrefAlign {
-                               abi: $SOME_ALIGN,
-                               pref: $SOME_ALIGN,
-                           },
-                           abi: Aggregate {
-                               sized: true,
-                           },
-                           fields: Arbitrary {
-                               offsets: [],
-                               memory_index: [],
-                           },
-                           largest_niche: None,
-                           variants: Single {
-                               index: 0,
-                           },
-                           max_repr_align: None,
-                           unadjusted_abi_align: $SOME_ALIGN,
-                       },
-                   },
-                   mode: Ignore,
-               },
-           ],
-           ret: ArgAbi {
-               layout: TyAndLayout {
-                   ty: (),
-                   layout: Layout {
-                       size: Size(0 bytes),
-                       align: AbiAndPrefAlign {
-                           abi: $SOME_ALIGN,
-                           pref: $SOME_ALIGN,
-                       },
-                       abi: Aggregate {
-                           sized: true,
-                       },
-                       fields: Arbitrary {
-                           offsets: [],
-                           memory_index: [],
-                       },
-                       largest_niche: None,
-                       variants: Single {
-                           index: 0,
-                       },
-                       max_repr_align: None,
-                       unadjusted_abi_align: $SOME_ALIGN,
-                   },
-               },
-               mode: Ignore,
-           },
-           c_variadic: false,
-           fixed_count: 1,
-           conv: C,
-           can_unwind: false,
-       }
-  --> $DIR/c-zst.rs:27:1
+error[E0463]: can't find crate for `std`
    |
-LL | extern "C" fn pass_zst(_: ()) {}
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: the `riscv64imac-unknown-none-elf` target may not support the standard library
+   = note: `std` is required by `<unknown>` because it does not declare `#![no_std]`
+   = help: consider building the standard library from source with `cargo build -Zbuild-std`
 
-error: aborting due to 1 previous error
+error: requires `sized` lang_item
 
+error: aborting due to 2 previous errors
+
+For more information about this error, try `rustc --explain E0463`.
