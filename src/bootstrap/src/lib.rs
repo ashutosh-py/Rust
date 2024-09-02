@@ -1934,6 +1934,7 @@ pub fn generate_smart_stamp_hash(
     dir: &Path,
     additional_input: &str,
 ) -> String {
+    // foo
     let diff = helpers::git(Some(dir))
         .allow_failure()
         .arg("diff")
