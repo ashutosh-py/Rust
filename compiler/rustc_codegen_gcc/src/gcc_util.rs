@@ -3,12 +3,12 @@ use gccjit::Context;
 use rustc_data_structures::fx::FxHashMap;
 use rustc_middle::bug;
 use rustc_session::Session;
-use rustc_target::target_features::RUSTC_SPECIFIC_FEATURES;
+use rustc_target::target_features::{Stability, RUSTC_SPECIFIC_FEATURES};
 use smallvec::{smallvec, SmallVec};
 
 use crate::errors::{
-    PossibleFeature, TargetFeatureDisableOrEnable, UnknownCTargetFeature,
-    UnknownCTargetFeaturePrefix,
+    ForbiddenCTargetFeature, PossibleFeature, TargetFeatureDisableOrEnable, UnknownCTargetFeature,
+    UnknownCTargetFeaturePrefix, UnstableCTargetFeature,
 };
 
 /// The list of GCC features computed from CLI flags (`-Ctarget-cpu`, `-Ctarget-feature`,
@@ -44,7 +44,7 @@ pub(crate) fn global_gcc_features(sess: &Session, diagnostics: bool) -> Vec<Stri
     );
 
     // -Ctarget-features
-    let supported_features = sess.target.supported_target_features();
+    let known_features = sess.target.known_target_features();
     let mut featsmap = FxHashMap::default();
     let feats = sess
         .opts
@@ -65,27 +65,41 @@ pub(crate) fn global_gcc_features(sess: &Session, diagnostics: bool) -> Vec<Stri
 
             let feature = backend_feature_name(s)?;
             // Warn against use of GCC specific feature names on the CLI.
-            if diagnostics && !supported_features.iter().any(|&(v, _, _)| v == feature) {
-                let rust_feature = supported_features.iter().find_map(|&(rust_feature, _, _)| {
-                    let gcc_features = to_gcc_features(sess, rust_feature);
-                    if gcc_features.contains(&feature) && !gcc_features.contains(&rust_feature) {
-                        Some(rust_feature)
-                    } else {
-                        None
-                    }
-                });
-                let unknown_feature = if let Some(rust_feature) = rust_feature {
-                    UnknownCTargetFeature {
-                        feature,
-                        rust_feature: PossibleFeature::Some { rust_feature },
-                    }
-                } else {
-                    UnknownCTargetFeature { feature, rust_feature: PossibleFeature::None }
-                };
-                sess.dcx().emit_warn(unknown_feature);
-            }
-
             if diagnostics {
+                let feature_state = known_features.iter().find(|&&(v, _, _)| v == feature);
+                match feature_state {
+                    None => {
+                        let rust_feature =
+                            known_features.iter().find_map(|&(rust_feature, _, _)| {
+                                let gcc_features = to_gcc_features(sess, rust_feature);
+                                if gcc_features.contains(&feature)
+                                    && !gcc_features.contains(&rust_feature)
+                                {
+                                    Some(rust_feature)
+                                } else {
+                                    None
+                                }
+                            });
+                        let unknown_feature = if let Some(rust_feature) = rust_feature {
+                            UnknownCTargetFeature {
+                                feature,
+                                rust_feature: PossibleFeature::Some { rust_feature },
+                            }
+                        } else {
+                            UnknownCTargetFeature { feature, rust_feature: PossibleFeature::None }
+                        };
+                        sess.dcx().emit_warn(unknown_feature);
+                    }
+                    Some((_, Stability::Stable, _)) => {}
+                    Some((_, Stability::Unstable(_), _)) => {
+                        // An unstable feature. Warn about using it.
+                        sess.dcx().emit_warn(UnstableCTargetFeature { feature });
+                    }
+                    Some((_, Stability::Forbidden, _)) => {
+                        sess.dcx().emit_err(ForbiddenCTargetFeature { feature });
+                    }
+                }
+
                 // FIXME(nagisa): figure out how to not allocate a full hashset here.
                 featsmap.insert(feature, enable_disable == '+');
             }
