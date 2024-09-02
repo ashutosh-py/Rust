@@ -72,7 +72,7 @@ fn codegen_fn_attrs(tcx: TyCtxt<'_>, did: LocalDefId) -> CodegenFnAttrs {
         codegen_fn_attrs.flags |= CodegenFnAttrFlags::NO_BUILTINS;
     }
 
-    let known_target_features = tcx.known_target_features(LOCAL_CRATE);
+    let rust_target_features = tcx.rust_target_features(LOCAL_CRATE);
 
     let mut inline_span = None;
     let mut link_ordinal_span = None;
@@ -301,7 +301,7 @@ fn codegen_fn_attrs(tcx: TyCtxt<'_>, did: LocalDefId) -> CodegenFnAttrs {
                 from_target_feature_attr(
                     tcx,
                     attr,
-                    known_target_features,
+                    rust_target_features,
                     &mut codegen_fn_attrs.target_features,
                 );
             }

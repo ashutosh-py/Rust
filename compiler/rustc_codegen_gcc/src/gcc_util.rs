@@ -44,7 +44,7 @@ pub(crate) fn global_gcc_features(sess: &Session, diagnostics: bool) -> Vec<Stri
     );
 
     // -Ctarget-features
-    let known_features = sess.target.known_target_features();
+    let known_features = sess.target.rust_target_features();
     let mut featsmap = FxHashMap::default();
     let feats = sess
         .opts

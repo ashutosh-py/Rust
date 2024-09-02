@@ -484,7 +484,7 @@ pub fn target_features(
 ) -> Vec<Symbol> {
     // TODO(antoyo): use global_gcc_features.
     sess.target
-        .known_target_features()
+        .rust_target_features()
         .iter()
         .filter_map(|&(feature, gate, _)| {
             if sess.is_nightly_build() || allow_unstable || gate.is_stable() {

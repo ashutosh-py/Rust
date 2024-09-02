@@ -309,7 +309,7 @@ pub fn target_features(sess: &Session, allow_unstable: bool) -> Vec<Symbol> {
     // Compute which of the known target features are enabled in the 'base' target machine.
     features.extend(
         sess.target
-            .known_target_features()
+            .rust_target_features()
             .iter()
             .filter(|(feature, _, _)| {
                 // skip checking special features, as LLVM may not understands them
@@ -356,7 +356,7 @@ pub fn target_features(sess: &Session, allow_unstable: bool) -> Vec<Symbol> {
 
     // Filter enabled features based on feature gates
     sess.target
-        .known_target_features()
+        .rust_target_features()
         .iter()
         .filter_map(|&(feature, gate, _)| {
             if sess.is_nightly_build() || allow_unstable || gate.is_stable() {
@@ -419,7 +419,7 @@ fn print_target_features(out: &mut String, sess: &Session, tm: &llvm::TargetMach
     let mut known_llvm_target_features = FxHashSet::<&'static str>::default();
     let mut rustc_target_features = sess
         .target
-        .known_target_features()
+        .rust_target_features()
         .iter()
         .filter_map(|(feature, gate, _implied)| {
             if matches!(gate, Stability::Forbidden) {
@@ -592,7 +592,7 @@ pub(crate) fn global_llvm_features(
 
     // -Ctarget-features
     if !only_base_features {
-        let known_features = sess.target.known_target_features();
+        let known_features = sess.target.rust_target_features();
         let (llvm_major, _, _) = get_version();
         let mut featsmap = FxHashMap::default();
 

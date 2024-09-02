@@ -88,7 +88,7 @@ impl Stability {
 
 type ImpliedFeatures = &'static [&'static str];
 
-const ARM_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
+const ARM_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-start
     ("aclass", Unstable(sym::arm_target_feature), &[]),
     ("aes", Unstable(sym::arm_target_feature), &["neon"]),
@@ -121,7 +121,7 @@ const ARM_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-end
 ];
 
-const AARCH64_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
+const AARCH64_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-start
     // FEAT_AES & FEAT_PMULL
     ("aes", Stable, &["neon"]),
@@ -309,7 +309,7 @@ const AARCH64_TIED_FEATURES: &[&[&str]] = &[
     &["paca", "pacg"], // Together these represent `pauth` in LLVM
 ];
 
-const X86_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
+const X86_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-start
     ("adx", Stable, &[]),
     ("aes", Stable, &["sse2"]),
@@ -380,14 +380,14 @@ const X86_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-end
 ];
 
-const HEXAGON_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
+const HEXAGON_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-start
     ("hvx", Unstable(sym::hexagon_target_feature), &[]),
     ("hvx-length128b", Unstable(sym::hexagon_target_feature), &["hvx"]),
     // tidy-alphabetical-end
 ];
 
-const POWERPC_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
+const POWERPC_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-start
     ("altivec", Unstable(sym::powerpc_target_feature), &[]),
     ("power10-vector", Unstable(sym::powerpc_target_feature), &["power9-vector"]),
@@ -399,7 +399,7 @@ const POWERPC_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-end
 ];
 
-const MIPS_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
+const MIPS_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-start
     ("fp64", Unstable(sym::mips_target_feature), &[]),
     ("msa", Unstable(sym::mips_target_feature), &[]),
@@ -407,7 +407,7 @@ const MIPS_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-end
 ];
 
-const RISCV_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
+const RISCV_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-start
     ("a", Stable, &[]),
     ("c", Stable, &[]),
@@ -444,7 +444,7 @@ const RISCV_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-end
 ];
 
-const WASM_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
+const WASM_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-start
     ("atomics", Unstable(sym::wasm_target_feature), &[]),
     ("bulk-memory", Stable, &[]),
@@ -460,10 +460,10 @@ const WASM_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-end
 ];
 
-const BPF_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] =
+const BPF_FEATURES: &[(&str, Stability, ImpliedFeatures)] =
     &[("alu32", Unstable(sym::bpf_target_feature), &[])];
 
-const CSKY_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
+const CSKY_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-start
     ("10e60", Unstable(sym::csky_target_feature), &["7e10"]),
     ("2e3", Unstable(sym::csky_target_feature), &["e2"]),
@@ -510,7 +510,7 @@ const CSKY_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-end
 ];
 
-const LOONGARCH_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
+const LOONGARCH_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-start
     ("d", Unstable(sym::loongarch_target_feature), &["f"]),
     ("f", Unstable(sym::loongarch_target_feature), &[]),
@@ -524,7 +524,7 @@ const LOONGARCH_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-end
 ];
 
-const IBMZ_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
+const IBMZ_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     // tidy-alphabetical-start
     ("backchain", Unstable(sym::s390x_target_feature), &[]),
     ("vector", Unstable(sym::s390x_target_feature), &[]),
@@ -537,37 +537,37 @@ const IBMZ_KNOWN_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
 /// IMPORTANT: If you're adding another feature list above, make sure to add it to this iterator!
 pub fn all_known_features() -> impl Iterator<Item = (&'static str, Stability)> {
     std::iter::empty()
-        .chain(ARM_KNOWN_FEATURES.iter())
-        .chain(AARCH64_KNOWN_FEATURES.iter())
-        .chain(X86_KNOWN_FEATURES.iter())
-        .chain(HEXAGON_KNOWN_FEATURES.iter())
-        .chain(POWERPC_KNOWN_FEATURES.iter())
-        .chain(MIPS_KNOWN_FEATURES.iter())
-        .chain(RISCV_KNOWN_FEATURES.iter())
-        .chain(WASM_KNOWN_FEATURES.iter())
-        .chain(BPF_KNOWN_FEATURES.iter())
-        .chain(CSKY_KNOWN_FEATURES)
-        .chain(LOONGARCH_KNOWN_FEATURES)
-        .chain(IBMZ_KNOWN_FEATURES)
+        .chain(ARM_FEATURES.iter())
+        .chain(AARCH64_FEATURES.iter())
+        .chain(X86_FEATURES.iter())
+        .chain(HEXAGON_FEATURES.iter())
+        .chain(POWERPC_FEATURES.iter())
+        .chain(MIPS_FEATURES.iter())
+        .chain(RISCV_FEATURES.iter())
+        .chain(WASM_FEATURES.iter())
+        .chain(BPF_FEATURES.iter())
+        .chain(CSKY_FEATURES)
+        .chain(LOONGARCH_FEATURES)
+        .chain(IBMZ_FEATURES)
         .cloned()
         .map(|(f, s, _)| (f, s))
 }
 
 impl super::spec::Target {
-    pub fn known_target_features(&self) -> &'static [(&'static str, Stability, ImpliedFeatures)] {
+    pub fn rust_target_features(&self) -> &'static [(&'static str, Stability, ImpliedFeatures)] {
         match &*self.arch {
-            "arm" => ARM_KNOWN_FEATURES,
-            "aarch64" | "arm64ec" => AARCH64_KNOWN_FEATURES,
-            "x86" | "x86_64" => X86_KNOWN_FEATURES,
-            "hexagon" => HEXAGON_KNOWN_FEATURES,
-            "mips" | "mips32r6" | "mips64" | "mips64r6" => MIPS_KNOWN_FEATURES,
-            "powerpc" | "powerpc64" => POWERPC_KNOWN_FEATURES,
-            "riscv32" | "riscv64" => RISCV_KNOWN_FEATURES,
-            "wasm32" | "wasm64" => WASM_KNOWN_FEATURES,
-            "bpf" => BPF_KNOWN_FEATURES,
-            "csky" => CSKY_KNOWN_FEATURES,
-            "loongarch64" => LOONGARCH_KNOWN_FEATURES,
-            "s390x" => IBMZ_KNOWN_FEATURES,
+            "arm" => ARM_FEATURES,
+            "aarch64" | "arm64ec" => AARCH64_FEATURES,
+            "x86" | "x86_64" => X86_FEATURES,
+            "hexagon" => HEXAGON_FEATURES,
+            "mips" | "mips32r6" | "mips64" | "mips64r6" => MIPS_FEATURES,
+            "powerpc" | "powerpc64" => POWERPC_FEATURES,
+            "riscv32" | "riscv64" => RISCV_FEATURES,
+            "wasm32" | "wasm64" => WASM_FEATURES,
+            "bpf" => BPF_FEATURES,
+            "csky" => CSKY_FEATURES,
+            "loongarch64" => LOONGARCH_FEATURES,
+            "s390x" => IBMZ_FEATURES,
             _ => &[],
         }
     }
@@ -584,7 +584,7 @@ impl super::spec::Target {
         base_features: impl Iterator<Item = Symbol>,
     ) -> FxHashSet<Symbol> {
         let implied_features = self
-            .known_target_features()
+            .rust_target_features()
             .iter()
             .map(|(f, _, i)| (Symbol::intern(f), i))
             .collect::<FxHashMap<_, _>>();

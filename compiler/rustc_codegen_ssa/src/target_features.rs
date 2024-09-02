@@ -21,7 +21,7 @@ use crate::errors;
 pub fn from_target_feature_attr(
     tcx: TyCtxt<'_>,
     attr: &ast::Attribute,
-    known_target_features: &UnordMap<String, target_features::Stability>,
+    rust_target_features: &UnordMap<String, target_features::Stability>,
     target_features: &mut Vec<TargetFeature>,
 ) {
     let Some(list) = attr.meta_item_list() else { return };
@@ -50,12 +50,12 @@ pub fn from_target_feature_attr(
 
         // We allow comma separation to enable multiple features.
         added_target_features.extend(value.as_str().split(',').filter_map(|feature| {
-            let Some(stability) = known_target_features.get(feature) else {
+            let Some(stability) = rust_target_features.get(feature) else {
                 let msg = format!("the feature named `{feature}` is not valid for this target");
                 let mut err = tcx.dcx().struct_span_err(item.span(), msg);
                 err.span_label(item.span(), format!("`{feature}` is not valid for this target"));
                 if let Some(stripped) = feature.strip_prefix('+') {
-                    let valid = known_target_features.contains_key(stripped);
+                    let valid = rust_target_features.contains_key(stripped);
                     if valid {
                         err.help("consider removing the leading `+` in the feature name");
                     }
@@ -197,7 +197,7 @@ pub fn check_target_feature_trait_unsafe(tcx: TyCtxt<'_>, id: LocalDefId, attr_s
 
 pub(crate) fn provide(providers: &mut Providers) {
     *providers = Providers {
-        known_target_features: |tcx, cnum| {
+        rust_target_features: |tcx, cnum| {
             assert_eq!(cnum, LOCAL_CRATE);
             if tcx.sess.opts.actually_rustdoc {
                 // rustdoc needs to be able to document functions that use all the features, so
@@ -208,7 +208,7 @@ pub(crate) fn provide(providers: &mut Providers) {
             } else {
                 tcx.sess
                     .target
-                    .known_target_features()
+                    .rust_target_features()
                     .iter()
                     .map(|&(a, b, _)| (a.to_string(), b))
                     .collect()
