@@ -24,8 +24,6 @@ LL | impl Bop for Bar<()> {}
 ...
 LL | impl Bop for i32 {}
    | ^^^^^^^^^^^^^^^^ conflicting implementation for `Bar<()>`
-   |
-   = note: upstream crates may add a new impl of trait `std::marker::FnPtr` for type `i32` in future versions
 
 error: aborting due to 3 previous errors
 
