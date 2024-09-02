@@ -100,7 +100,7 @@
 //! Rust's collections never automatically shrink, so removal operations aren't
 //! amortized.
 //!
-//! [`HashMap`] uses *expected costs to denote that it is theoretically possible,
+//! [`HashMap`] uses *expected* costs to denote that it is theoretically possible,
 //! though very unlikely, for [`HashMap`] to experience worse performance than
 //! the expected cost. This is due to the probablilistic nature of hashing -
 //! i.e. it is possible to generate a duplicate hash given some input key that
