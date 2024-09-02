@@ -2160,10 +2160,10 @@ rustc_queries! {
         desc { "computing autoderef types for `{}`", goal.value.value }
     }
 
-    query supported_target_features(_: CrateNum) -> &'tcx UnordMap<String, Option<Symbol>> {
+    query known_target_features(_: CrateNum) -> &'tcx UnordMap<String, rustc_target::target_features::Stability> {
         arena_cache
         eval_always
-        desc { "looking up supported target features" }
+        desc { "looking up known target features" }
     }
 
     query implied_target_features(feature: Symbol) -> &'tcx Vec<Symbol> {

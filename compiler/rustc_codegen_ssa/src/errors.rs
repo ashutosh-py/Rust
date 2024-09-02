@@ -1018,6 +1018,14 @@ pub struct TargetFeatureSafeTrait {
 }
 
 #[derive(Diagnostic)]
+#[diag(codegen_ssa_forbidden_target_feature)]
+pub struct ForbiddenTargetFeature<'a> {
+    #[primary_span]
+    pub span: Span,
+    pub feature: &'a str,
+}
+
+#[derive(Diagnostic)]
 #[diag(codegen_ssa_failed_to_get_layout)]
 pub struct FailedToGetLayout<'tcx> {
     #[primary_span]

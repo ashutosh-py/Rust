@@ -31,6 +31,12 @@ pub(crate) struct UnstableCTargetFeature<'a> {
     pub feature: &'a str,
 }
 
+#[derive(Diagnostic)]
+#[diag(codegen_llvm_forbidden_ctarget_feature)]
+pub(crate) struct ForbiddenCTargetFeature<'a> {
+    pub feature: &'a str,
+}
+
 #[derive(Subdiagnostic)]
 pub(crate) enum PossibleFeature<'a> {
     #[help(codegen_llvm_possible_feature)]

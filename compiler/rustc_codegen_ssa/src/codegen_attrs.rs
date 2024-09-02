@@ -20,7 +20,7 @@ use rustc_span::{sym, Span};
 use rustc_target::spec::{abi, SanitizerSet};
 
 use crate::errors;
-use crate::target_features::{check_target_feature_trait_unsafe, from_target_feature};
+use crate::target_features::{check_target_feature_trait_unsafe, from_target_feature_attr};
 
 fn linkage_by_name(tcx: TyCtxt<'_>, def_id: LocalDefId, name: &str) -> Linkage {
     use rustc_middle::mir::mono::Linkage::*;
@@ -72,7 +72,7 @@ fn codegen_fn_attrs(tcx: TyCtxt<'_>, did: LocalDefId) -> CodegenFnAttrs {
         codegen_fn_attrs.flags |= CodegenFnAttrFlags::NO_BUILTINS;
     }
 
-    let supported_target_features = tcx.supported_target_features(LOCAL_CRATE);
+    let known_target_features = tcx.known_target_features(LOCAL_CRATE);
 
     let mut inline_span = None;
     let mut link_ordinal_span = None;
@@ -298,10 +298,10 @@ fn codegen_fn_attrs(tcx: TyCtxt<'_>, did: LocalDefId) -> CodegenFnAttrs {
                         check_target_feature_trait_unsafe(tcx, did, attr.span);
                     }
                 }
-                from_target_feature(
+                from_target_feature_attr(
                     tcx,
                     attr,
-                    supported_target_features,
+                    known_target_features,
                     &mut codegen_fn_attrs.target_features,
                 );
             }
