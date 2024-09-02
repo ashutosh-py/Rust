@@ -297,7 +297,7 @@ pub(crate) fn check_tied_features(
 /// Used to generate cfg variables and apply features
 /// Must express features in the way Rust understands them
 pub fn target_features(sess: &Session, allow_unstable: bool) -> Vec<Symbol> {
-    let mut features = vec![];
+    let mut features: FxHashSet<Symbol> = Default::default();
 
     // Add base features for the target.
     // We do *not* add the -Ctarget-features there, and instead duplicate the logic for that below.
@@ -306,7 +306,7 @@ pub fn target_features(sess: &Session, allow_unstable: bool) -> Vec<Symbol> {
     // the target CPU, that is still expanded to target features (with all their implied features) by
     // LLVM.
     let target_machine = create_informational_target_machine(sess, true);
-    // Compute which of the known target features are enables in the 'base' target machine.
+    // Compute which of the known target features are enabled in the 'base' target machine.
     features.extend(
         sess.target
             .known_target_features()
@@ -343,7 +343,12 @@ pub fn target_features(sess: &Session, allow_unstable: bool) -> Vec<Symbol> {
         if enabled {
             features.extend(sess.target.implied_target_features(std::iter::once(feature)));
         } else {
+            // We don't care about the order in `features` since the only thing we use it for is the
+            // `features.contains` below.
+            #[allow(rustc::potential_query_instability)]
             features.retain(|f| {
+                // Keep a feature if it does not imply `feature`. Or, equivalently,
+                // remove the reverse-dependencies of `feature`.
                 !sess.target.implied_target_features(std::iter::once(*f)).contains(&feature)
             });
         }
