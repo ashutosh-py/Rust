@@ -79,7 +79,6 @@
 //! see each type's documentation, and note that the names of actual methods may
 //! differ from the tables below on certain collections.
 //!
-//! ## Conventions
 //! Throughout the documentation, we will adhere to the following conventions for 
 //! operation notation: 
 //!
@@ -89,23 +88,19 @@
 //! * Operations which have an *amortized* cost are suffixed with a `*`. 
 //! * Operations with an *expected* cost are suffixed with a `~`.
 //!
-//! ### Amortized Costs
-//!
 //! Calling operations that add to a collection will occasionally require a
 //! collection to be resized - an extra operation that takes *O*(*n*) time.
 //!
-//! Amortized costs are calculated to account for the time cost of this resize
-//! *over a sufficiently large series of operations*. An individual operation
-//! may be slower or faster due to the sporadic nature of collection resizing,
-//! however the average cost per operation will eventually equal the amortized
-//! cost.
+//! *Amortized* costs are calculated to account for the time cost of such resize
+//! operations *over a sufficiently large series of operations*. An individual
+//! operation may be slower or faster due to the sporadic nature of collection
+//! resizing, however the average cost per operation will eventually equal the
+//! amortized cost.
 //!
 //! Rust's collections never automatically shrink, so removal operations aren't
 //! amortized.
 //!
-//! ### Expected Costs
-//!
-//! [`HashMap`] uses expected costs to denote that it is theoretically possible,
+//! [`HashMap`] uses *expected costs to denote that it is theoretically possible,
 //! though very unlikely, for [`HashMap`] to experience worse performance than
 //! the expected cost. This is due to the probablilistic nature of hashing -
 //! i.e. it is possible to generate a duplicate hash given some input key that
