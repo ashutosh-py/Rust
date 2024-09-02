@@ -97,11 +97,13 @@ const ARM_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
     ("dotprod", Unstable(sym::arm_target_feature), &["neon"]),
     ("dsp", Unstable(sym::arm_target_feature), &[]),
     ("fp-armv8", Unstable(sym::arm_target_feature), &["vfp4"]),
+    ("fpregs", Forbidden, &[]), // changes float ABI
     ("i8mm", Unstable(sym::arm_target_feature), &["neon"]),
     ("mclass", Unstable(sym::arm_target_feature), &[]),
     ("neon", Unstable(sym::arm_target_feature), &["vfp3"]),
     ("rclass", Unstable(sym::arm_target_feature), &[]),
     ("sha2", Unstable(sym::arm_target_feature), &["neon"]),
+    ("soft-float", Forbidden, &[]), // changes float ABI
     // This is needed for inline assembly, but shouldn't be stabilized as-is
     // since it should be enabled per-function using #[instruction_set], not
     // #[target_feature].
