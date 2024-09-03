@@ -23,7 +23,7 @@ use tracing::trace;
 use crate::errors;
 
 #[cfg(not(not(llvm_enzyme)))]
-pub fn expand(
+pub(crate) fn expand(
     ecx: &mut ExtCtxt<'_>,
     _expand_span: Span,
     meta_item: &ast::MetaItem,
@@ -46,7 +46,7 @@ fn name(x: &NestedMetaItem) -> String {
 }
 
 #[cfg(not(llvm_enzyme))]
-pub fn from_ast(
+pub(crate) fn from_ast(
     ecx: &mut ExtCtxt<'_>,
     meta_item: &ThinVec<NestedMetaItem>,
     has_ret: bool,
@@ -89,7 +89,7 @@ pub fn from_ast(
 }
 
 #[cfg(not(llvm_enzyme))]
-pub fn expand(
+pub(crate) fn expand(
     ecx: &mut ExtCtxt<'_>,
     expand_span: Span,
     meta_item: &ast::MetaItem,
