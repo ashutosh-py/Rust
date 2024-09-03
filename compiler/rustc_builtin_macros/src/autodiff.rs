@@ -22,6 +22,14 @@ use tracing::trace;
 
 use crate::errors;
 
+#[cfg(not(llvm_enzyme))]
+fn has_ret(ty: &FnRetTy) -> bool {
+    match ty {
+        FnRetTy::Ty(ty) => !ty.kind.is_unit(),
+        FnRetTy::Default(_) => false,
+    }
+}
+
 #[cfg(not(not(llvm_enzyme)))]
 pub(crate) fn expand(
     ecx: &mut ExtCtxt<'_>,
@@ -135,7 +143,7 @@ pub(crate) fn expand(
         }
     };
 
-    let has_ret = sig.decl.output.has_ret();
+    let has_ret = has_ret(&sig.decl.output);
     let sig_span = ecx.with_call_site_ctxt(sig.span);
 
     let (vis, primal) = match &item {
@@ -159,7 +167,7 @@ pub(crate) fn expand(
         ts.push(TokenTree::Token(t, Spacing::Joint));
         ts.push(TokenTree::Token(comma.clone(), Spacing::Alone));
     }
-    if !sig.decl.output.has_ret() {
+    if !has_ret {
         // We don't want users to provide a return activity if the function doesn't return anything.
         // For simplicity, we just add a dummy token to the end of the list.
         let t = Token::new(TokenKind::Ident(sym::None, false.into()), Span::default());
@@ -372,14 +380,14 @@ fn gen_enzyme_body(
     body.stmts.push(ecx.stmt_semi(black_box_primal_call.clone()));
     body.stmts.push(ecx.stmt_semi(black_box_remaining_args));
 
-    if !d_sig.decl.output.has_ret() {
+    if !has_ret(&d_sig.decl.output) {
         // there is no return type that we have to match, () works fine.
         return body;
     }
 
     // having an active-only return means we'll drop the original return type.
     // So that can be treated identical to not having one in the first place.
-    let primal_ret = sig.decl.output.has_ret() && !x.has_active_only_ret();
+    let primal_ret = has_ret(&sig.decl.output) && !x.has_active_only_ret();
 
     if primal_ret && n_active == 0 && x.mode.is_rev() {
         // We only have the primal ret.
@@ -475,11 +483,11 @@ fn gen_enzyme_body(
         let ret_scal = exprs.pop().unwrap();
         ret = ecx.expr_call(new_decl_span, blackbox_call_expr.clone(), thin_vec![ret_scal]);
     } else {
-        assert!(!d_sig.decl.output.has_ret());
+        assert!(!has_ret(&d_sig.decl.output));
         // We don't have to match the return type.
         return body;
     }
-    assert!(d_sig.decl.output.has_ret());
+    assert!(has_ret(&d_sig.decl.output));
     body.stmts.push(ecx.stmt_expr(ret));
 
     body
@@ -519,7 +527,8 @@ fn gen_enzyme_decl(
     x: &AutoDiffAttrs,
     span: Span,
 ) -> (ast::FnSig, Vec<String>, Vec<Ident>) {
-    let sig_args = sig.decl.inputs.len() + if sig.decl.output.has_ret() { 1 } else { 0 };
+    let has_ret = has_ret(&sig.decl.output);
+    let sig_args = sig.decl.inputs.len() + if has_ret { 1 } else { 0 };
     let num_activities = x.input_activity.len() + if x.has_ret_activity() { 1 } else { 0 };
     if sig_args != num_activities {
         ecx.sess.dcx().emit_fatal(errors::AutoDiffInvalidNumberActivities {
@@ -529,7 +538,7 @@ fn gen_enzyme_decl(
         });
     }
     assert!(sig.decl.inputs.len() == x.input_activity.len());
-    assert!(sig.decl.output.has_ret() == x.has_ret_activity());
+    assert!(has_ret == x.has_ret_activity());
     let mut d_decl = sig.decl.clone();
     let mut d_inputs = Vec::new();
     let mut new_inputs = Vec::new();
