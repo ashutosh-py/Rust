@@ -248,17 +248,11 @@ impl AutoDiffAttrs {
     }
 
     pub fn is_active(&self) -> bool {
-        match self.mode {
-            DiffMode::Inactive => false,
-            _ => true,
-        }
+        self.mode != DiffMode::Inactive
     }
 
     pub fn is_source(&self) -> bool {
-        match self.mode {
-            DiffMode::Source => true,
-            _ => false,
-        }
+        self.mode == DiffMode::Source
     }
     pub fn apply_autodiff(&self) -> bool {
         match self.mode {
