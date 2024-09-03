@@ -202,7 +202,7 @@ pub(crate) fn provide(providers: &mut Providers) {
             if tcx.sess.opts.actually_rustdoc {
                 // rustdoc needs to be able to document functions that use all the features, so
                 // whitelist them all
-                rustc_target::target_features::all_known_features()
+                rustc_target::target_features::all_rust_features()
                     .map(|(a, b)| (a.to_string(), b))
                     .collect()
             } else {

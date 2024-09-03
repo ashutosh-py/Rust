@@ -38,15 +38,13 @@ impl<CTX> HashStable<CTX> for Stability {
 }
 
 impl Stability {
-    pub fn as_feature_name(self) -> Option<Symbol> {
-        match self {
-            Unstable(s) => Some(s),
-            _ => None,
-        }
-    }
-
     pub fn is_stable(self) -> bool {
         matches!(self, Stable)
+    }
+
+    /// Forbidden features are not supported.
+    pub fn is_supported(self) -> bool {
+        !matches!(self, Forbidden)
     }
 }
 
@@ -537,7 +535,7 @@ const IBMZ_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
 /// primitives may be documented.
 ///
 /// IMPORTANT: If you're adding another feature list above, make sure to add it to this iterator!
-pub fn all_known_features() -> impl Iterator<Item = (&'static str, Stability)> {
+pub fn all_rust_features() -> impl Iterator<Item = (&'static str, Stability)> {
     std::iter::empty()
         .chain(ARM_FEATURES.iter())
         .chain(AARCH64_FEATURES.iter())

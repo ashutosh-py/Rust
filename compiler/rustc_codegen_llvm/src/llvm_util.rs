@@ -307,12 +307,14 @@ pub fn target_features(sess: &Session, allow_unstable: bool) -> Vec<Symbol> {
     // LLVM.
     let target_machine = create_informational_target_machine(sess, true);
     // Compute which of the known target features are enabled in the 'base' target machine.
+    // We only consider "supported" features; "forbidden" features are not reflected in `cfg` as of now.
     features.extend(
         sess.target
             .rust_target_features()
             .iter()
+            .filter(|(_, gate, _)| gate.is_supported())
             .filter(|(feature, _, _)| {
-                // skip checking special features, as LLVM may not understands them
+                // skip checking special features, as LLVM may not understand them
                 if RUSTC_SPECIAL_FEATURES.contains(feature) {
                     return true;
                 }
@@ -358,6 +360,7 @@ pub fn target_features(sess: &Session, allow_unstable: bool) -> Vec<Symbol> {
     sess.target
         .rust_target_features()
         .iter()
+        .filter(|(_, gate, _)| gate.is_supported())
         .filter_map(|&(feature, gate, _)| {
             if sess.is_nightly_build() || allow_unstable || gate.is_stable() {
                 Some(feature)
@@ -422,8 +425,8 @@ fn print_target_features(out: &mut String, sess: &Session, tm: &llvm::TargetMach
         .rust_target_features()
         .iter()
         .filter_map(|(feature, gate, _implied)| {
-            if matches!(gate, Stability::Forbidden) {
-                // Do not list forbidden features.
+            if !gate.is_supported() {
+                // Only list (experimentally) supported features.
                 return None;
             }
             // LLVM asserts that these are sorted. LLVM and Rust both use byte comparison for these strings.
