@@ -1,10 +1,16 @@
-use std::iter;
+use std::{iter, usize};
 
+use rustc_const_eval::const_eval::mk_eval_cx_for_const_val;
+use rustc_index::bit_set::BitSet;
 use rustc_index::IndexSlice;
 use rustc_middle::mir::patch::MirPatch;
 use rustc_middle::mir::*;
+use rustc_middle::ty;
 use rustc_middle::ty::layout::{IntegerExt, TyAndLayout};
+use rustc_middle::ty::util::Discr;
 use rustc_middle::ty::{ParamEnv, ScalarInt, Ty, TyCtxt};
+use rustc_mir_dataflow::impls::{borrowed_locals, MaybeTransitiveLiveLocals};
+use rustc_mir_dataflow::Analysis;
 use rustc_target::abi::Integer;
 use rustc_type_ir::TyKind::*;
 
@@ -45,6 +51,10 @@ impl<'tcx> MirPass<'tcx> for MatchBranchSimplification {
                 continue;
             }
             if SimplifyToExp::default().simplify(tcx, body, bb_idx, param_env).is_some() {
+                should_cleanup = true;
+                continue;
+            }
+            if simplify_to_copy(tcx, body, bb_idx, param_env).is_some() {
                 should_cleanup = true;
                 continue;
             }
@@ -514,4 +524,213 @@ impl<'tcx> SimplifyMatch<'tcx> for SimplifyToExp {
             }
         }
     }
+}
+
+/// This is primarily used to merge these copy statements that simplified the canonical enum clone method by GVN.
+/// The GVN simplified
+/// ```ignore (syntax-highlighting-only)
+/// match a {
+///     Foo::A(x) => Foo::A(*x),
+///     Foo::B => Foo::B
+/// }
+/// ```
+/// to
+/// ```ignore (syntax-highlighting-only)
+/// match a {
+///     Foo::A(_x) => a, // copy a
+///     Foo::B => Foo::B
+/// }
+/// ```
+/// This function will simplify into a copy statement.
+fn simplify_to_copy<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    body: &mut Body<'tcx>,
+    switch_bb_idx: BasicBlock,
+    param_env: ParamEnv<'tcx>,
+) -> Option<()> {
+    // To save compile time, only consider the first BB has a switch terminator.
+    if switch_bb_idx != START_BLOCK {
+        return None;
+    }
+    let bbs = &body.basic_blocks;
+    // Check if the copy source matches the following pattern.
+    // _2 = discriminant(*_1); // "*_1" is the expected the copy source.
+    // switchInt(move _2) -> [0: bb3, 1: bb2, otherwise: bb1];
+    let &Statement {
+        kind: StatementKind::Assign(box (discr_place, Rvalue::Discriminant(expected_src_place))),
+        ..
+    } = bbs[switch_bb_idx].statements.last()?
+    else {
+        return None;
+    };
+    let expected_src_ty = expected_src_place.ty(body.local_decls(), tcx);
+    if !expected_src_ty.ty.is_enum() || expected_src_ty.variant_index.is_some() {
+        return None;
+    }
+    // To save compile time, only consider the copy source is assigned to the return place.
+    let expected_dest_place = Place::return_place();
+    let expected_dest_ty = expected_dest_place.ty(body.local_decls(), tcx);
+    if expected_dest_ty.ty != expected_src_ty.ty || expected_dest_ty.variant_index.is_some() {
+        return None;
+    }
+    let targets = match bbs[switch_bb_idx].terminator().kind {
+        TerminatorKind::SwitchInt { ref discr, ref targets, .. }
+            if discr.place() == Some(discr_place) =>
+        {
+            targets
+        }
+        _ => return None,
+    };
+    // We require that the possible target blocks all be distinct.
+    if !targets.is_distinct() {
+        return None;
+    }
+    if !bbs[targets.otherwise()].is_empty_unreachable() {
+        return None;
+    }
+    // Check that destinations are identical, and if not, then don't optimize this block.
+    let mut target_iter = targets.iter();
+    let first_terminator_kind = &bbs[target_iter.next().unwrap().1].terminator().kind;
+    if !target_iter
+        .all(|(_, other_target)| first_terminator_kind == &bbs[other_target].terminator().kind)
+    {
+        return None;
+    }
+
+    let borrowed_locals = borrowed_locals(body);
+    let mut live = None;
+
+    for (index, target_bb) in targets.iter() {
+        let stmts = &bbs[target_bb].statements;
+        if stmts.is_empty() {
+            return None;
+        }
+        if let [Statement { kind: StatementKind::Assign(box (place, rvalue)), .. }] =
+            bbs[target_bb].statements.as_slice()
+        {
+            let dest_ty = place.ty(body.local_decls(), tcx);
+            if dest_ty.ty != expected_src_ty.ty || dest_ty.variant_index.is_some() {
+                return None;
+            }
+            let ty::Adt(def, _) = dest_ty.ty.kind() else {
+                return None;
+            };
+            if expected_dest_place != *place {
+                return None;
+            }
+            match rvalue {
+                // Check if `_3 = const Foo::B` can be transformed to `_3 = copy *_1`.
+                Rvalue::Use(Operand::Constant(box constant))
+                    if let Const::Val(const_, ty) = constant.const_ =>
+                {
+                    let (ecx, op) =
+                        mk_eval_cx_for_const_val(tcx.at(constant.span), param_env, const_, ty)?;
+                    let variant = ecx.read_discriminant(&op).ok()?;
+                    if !def.variants()[variant].fields.is_empty() {
+                        return None;
+                    }
+                    let Discr { val, .. } = ty.discriminant_for_variant(tcx, variant)?;
+                    if val != index {
+                        return None;
+                    }
+                }
+                Rvalue::Use(Operand::Copy(src_place)) if *src_place == expected_src_place => {}
+                // Check if `_3 = Foo::B` can be transformed to `_3 = copy *_1`.
+                Rvalue::Aggregate(box AggregateKind::Adt(_, variant_index, _, _, None), fields)
+                    if fields.is_empty()
+                        && let Some(Discr { val, .. }) =
+                            expected_src_ty.ty.discriminant_for_variant(tcx, *variant_index)
+                        && val == index => {}
+                _ => return None,
+            }
+        } else {
+            // If the BB contains more than one statement, we have to check if these statements can be ignored.
+            let mut lived_stmts: BitSet<usize> =
+                BitSet::new_filled(bbs[target_bb].statements.len());
+            let mut expected_copy_stmt = None;
+            for (statement_index, statement) in bbs[target_bb].statements.iter().enumerate().rev() {
+                let loc = Location { block: target_bb, statement_index };
+                if let StatementKind::Assign(assign) = &statement.kind {
+                    if !assign.1.is_safe_to_remove() {
+                        return None;
+                    }
+                }
+                match &statement.kind {
+                    StatementKind::Assign(box (place, _))
+                    | StatementKind::SetDiscriminant { place: box place, .. }
+                    | StatementKind::Deinit(box place) => {
+                        if place.is_indirect() || borrowed_locals.contains(place.local) {
+                            return None;
+                        }
+                        let live = live.get_or_insert_with(|| {
+                            MaybeTransitiveLiveLocals::new(&borrowed_locals)
+                                .into_engine(tcx, body)
+                                .iterate_to_fixpoint()
+                                .into_results_cursor(body)
+                        });
+                        live.seek_before_primary_effect(loc);
+                        if !live.get().contains(place.local) {
+                            lived_stmts.remove(statement_index);
+                        } else if let StatementKind::Assign(box (
+                            _,
+                            Rvalue::Use(Operand::Copy(src_place)),
+                        )) = statement.kind
+                            && expected_copy_stmt.is_none()
+                            && expected_src_place == src_place
+                            && expected_dest_place == *place
+                        {
+                            // There is only one statement that cannot be ignored that can be used as an expected copy statement.
+                            expected_copy_stmt = Some(statement_index);
+                        } else {
+                            return None;
+                        }
+                    }
+                    StatementKind::StorageLive(_)
+                    | StatementKind::StorageDead(_)
+                    | StatementKind::Nop => (),
+
+                    StatementKind::Retag(_, _)
+                    | StatementKind::Coverage(_)
+                    | StatementKind::Intrinsic(_)
+                    | StatementKind::ConstEvalCounter
+                    | StatementKind::PlaceMention(_)
+                    | StatementKind::FakeRead(_)
+                    | StatementKind::AscribeUserType(_, _) => {
+                        return None;
+                    }
+                }
+            }
+            let expected_copy_stmt = expected_copy_stmt?;
+            // We can ignore the paired StorageLive and StorageDead.
+            let mut storage_live_locals: BitSet<Local> = BitSet::new_empty(body.local_decls.len());
+            for stmt_index in lived_stmts.iter() {
+                let statement = &bbs[target_bb].statements[stmt_index];
+                match &statement.kind {
+                    StatementKind::Assign(_) if expected_copy_stmt == stmt_index => {}
+                    StatementKind::StorageLive(local)
+                        if *local != expected_dest_place.local
+                            && storage_live_locals.insert(*local) => {}
+                    StatementKind::StorageDead(local)
+                        if *local != expected_dest_place.local
+                            && storage_live_locals.remove(*local) => {}
+                    StatementKind::Nop => {}
+                    _ => return None,
+                }
+            }
+            if !storage_live_locals.is_empty() {
+                return None;
+            }
+        }
+    }
+    let statement_index = bbs[switch_bb_idx].statements.len();
+    let parent_end = Location { block: switch_bb_idx, statement_index };
+    let mut patch = MirPatch::new(body);
+    patch.add_assign(
+        parent_end,
+        expected_dest_place,
+        Rvalue::Use(Operand::Copy(expected_src_place)),
+    );
+    patch.patch_terminator(switch_bb_idx, first_terminator_kind.clone());
+    patch.apply(body);
+    Some(())
 }
