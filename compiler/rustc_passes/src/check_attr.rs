@@ -2411,7 +2411,7 @@ impl<'tcx> CheckAttrVisitor<'tcx> {
 
     /// Checks if `#[autodiff]` is applied to an item other than a function item.
     fn check_autodiff(&self, _hir_id: HirId, _attr: &Attribute, span: Span, target: Target) {
-        trace!("check_autodiff");
+        debug!("check_autodiff");
         match target {
             Target::Fn => {}
             _ => {
