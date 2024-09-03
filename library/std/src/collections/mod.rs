@@ -79,13 +79,13 @@
 //! see each type's documentation, and note that the names of actual methods may
 //! differ from the tables below on certain collections.
 //!
-//! Throughout the documentation, we will adhere to the following conventions for 
-//! operation notation: 
+//! Throughout the documentation, we will adhere to the following conventions for
+//! operation notation:
 //!
 //! * The collection's size is denoted by `n`.
-//! * If a second collection is involved, it's size is denoted by `m`. 
+//! * If a second collection is involved, it's size is denoted by `m`.
 //! * Item indices are denoted by `i`.
-//! * Operations which have an *amortized* cost are suffixed with a `*`. 
+//! * Operations which have an *amortized* cost are suffixed with a `*`.
 //! * Operations with an *expected* cost are suffixed with a `~`.
 //!
 //! Calling operations that add to a collection will occasionally require a
