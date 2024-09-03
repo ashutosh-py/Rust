@@ -3,8 +3,7 @@ use std::str::FromStr;
 use std::string::String;
 
 use rustc_ast::expand::autodiff_attrs::{
-    is_fwd, is_rev, valid_input_activity, valid_ty_for_activity, AutoDiffAttrs, DiffActivity,
-    DiffMode,
+    valid_input_activity, valid_ty_for_activity, AutoDiffAttrs, DiffActivity, DiffMode,
 };
 use rustc_ast::ptr::P;
 use rustc_ast::token::{Token, TokenKind};
@@ -382,7 +381,7 @@ fn gen_enzyme_body(
     // So that can be treated identical to not having one in the first place.
     let primal_ret = sig.decl.output.has_ret() && !x.has_active_only_ret();
 
-    if primal_ret && n_active == 0 && is_rev(x.mode) {
+    if primal_ret && n_active == 0 && x.mode.is_rev() {
         // We only have the primal ret.
         body.stmts.push(ecx.stmt_expr(black_box_primal_call.clone()));
         return body;
@@ -437,7 +436,7 @@ fn gen_enzyme_body(
             panic!("Did not expect non-tuple ret ty: {:?}", d_ret_ty);
         }
     };
-    if is_fwd(x.mode) {
+    if x.mode.is_fwd() {
         if x.ret_activity == DiffActivity::Dual {
             assert!(d_ret_ty.len() == 2);
             // both should be identical, by construction
@@ -451,7 +450,7 @@ fn gen_enzyme_body(
             exprs.push(default_call_expr);
         }
     } else {
-        assert!(is_rev(x.mode));
+        assert!(x.mode.is_rev());
 
         if primal_ret {
             // We have extra handling above for the primal ret
@@ -562,7 +561,7 @@ fn gen_enzyme_decl(
                 let old_name = if let PatKind::Ident(_, ident, _) = arg.pat.kind {
                     ident.name
                 } else {
-                    trace!("{:#?}", &shadow_arg.pat);
+                    dbg!(&shadow_arg.pat);
                     panic!("not an ident?");
                 };
                 let name: String = format!("d{}", old_name);
@@ -582,7 +581,7 @@ fn gen_enzyme_decl(
                 let old_name = if let PatKind::Ident(_, ident, _) = arg.pat.kind {
                     ident.name
                 } else {
-                    trace!("{:#?}", &shadow_arg.pat);
+                    dbg!(&shadow_arg.pat);
                     panic!("not an ident?");
                 };
                 let name: String = format!("b{}", old_name);
@@ -601,7 +600,7 @@ fn gen_enzyme_decl(
                 // Nothing to do here.
             }
             _ => {
-                trace!{"{:#?}", &activity};
+                dbg!(&activity);
                 panic!("Not implemented");
             }
         }
@@ -614,12 +613,12 @@ fn gen_enzyme_decl(
 
     let active_only_ret = x.ret_activity == DiffActivity::ActiveOnly;
     if active_only_ret {
-        assert!(is_rev(x.mode));
+        assert!(x.mode.is_rev());
     }
 
     // If we return a scalar in the primal and the scalar is active,
     // then add it as last arg to the inputs.
-    if is_rev(x.mode) {
+    if x.mode.is_rev() {
         match x.ret_activity {
             DiffActivity::Active | DiffActivity::ActiveOnly => {
                 let ty = match d_decl.output {
@@ -651,7 +650,7 @@ fn gen_enzyme_decl(
     }
     d_decl.inputs = d_inputs.into();
 
-    if is_fwd(x.mode) {
+    if x.mode.is_fwd() {
         if let DiffActivity::Dual = x.ret_activity {
             let ty = match d_decl.output {
                 FnRetTy::Ty(ref ty) => ty.clone(),
