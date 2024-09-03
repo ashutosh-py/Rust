@@ -22,7 +22,7 @@ pub(crate) struct IncorrectDoNotRecommendLocation;
 
 #[derive(Diagnostic)]
 #[diag(passes_autodiff_attr)]
-pub struct AutoDiffAttr {
+pub(crate) struct AutoDiffAttr {
     #[primary_span]
     #[label]
     pub attr_span: Span,
