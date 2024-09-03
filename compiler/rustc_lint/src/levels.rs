@@ -1086,8 +1086,7 @@ impl<'s, P: LintLevelsProvider> LintLevelsBuilder<'s, P> {
 }
 
 pub(crate) fn provide(providers: &mut Providers) {
-    *providers =
-        Providers { shallow_lint_levels_on, lints_that_dont_need_to_run, ..*providers };
+    *providers = Providers { shallow_lint_levels_on, lints_that_dont_need_to_run, ..*providers };
 }
 
 pub(crate) fn parse_lint_and_tool_name(lint_name: &str) -> (Option<Symbol>, &str) {
