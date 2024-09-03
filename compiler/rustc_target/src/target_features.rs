@@ -1,11 +1,17 @@
+//! Declares Rust's target feature names for each target.
+//! Note that these are similar to but not always identical to LLVM's feature names,
+//! and Rust adds some features that do not correspond to LLVM features at all.
 use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 use rustc_span::symbol::{sym, Symbol};
 
 /// Features that control behaviour of rustc, rather than the codegen.
+/// These exist globally and are not in the target-specific lists below.
 pub const RUSTC_SPECIFIC_FEATURES: &[&str] = &["crt-static"];
 
-/// Features that require special handling when passing to LLVM.
+/// Features that require special handling when passing to LLVM:
+/// these are target-specific (i.e., must also be listed in the target-specific list below)
+/// but do not correspond to an LLVM target feature.
 pub const RUSTC_SPECIAL_FEATURES: &[&str] = &["backchain"];
 
 /// Stability information for target features.

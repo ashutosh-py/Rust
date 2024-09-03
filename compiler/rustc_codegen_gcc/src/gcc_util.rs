@@ -63,6 +63,8 @@ pub(crate) fn global_gcc_features(sess: &Session, diagnostics: bool) -> Vec<Stri
                 }
             };
 
+            // Get the backend feature name, if any.
+            // This excludes rustc-specific features, that do not get passed down to GCC.
             let feature = backend_feature_name(s)?;
             // Warn against use of GCC specific feature names on the CLI.
             if diagnostics {
@@ -104,10 +106,6 @@ pub(crate) fn global_gcc_features(sess: &Session, diagnostics: bool) -> Vec<Stri
                 featsmap.insert(feature, enable_disable == '+');
             }
 
-            // rustc-specific features do not get passed down to GCC…
-            if RUSTC_SPECIFIC_FEATURES.contains(&feature) {
-                return None;
-            }
             // ... otherwise though we run through `to_gcc_features` when
             // passing requests down to GCC. This means that all in-language
             // features also work on the command line instead of having two
