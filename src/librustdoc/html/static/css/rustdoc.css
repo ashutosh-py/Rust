@@ -34,6 +34,8 @@ xmlns="http://www.w3.org/2000/svg" fill="black" height="18px">\
 </g></svg>');
 	--button-left-margin: 4px;
 	--button-border-radius: 2px;
+	--toolbar-button-border-radius: 6px;
+	--code-block-border-radius: 6px;
 }
 
 /* See FiraSans-LICENSE.txt for the Fira Sans license. */
@@ -183,7 +185,7 @@ h1, h2, h3, h4 {
 	grid-template-columns: 1fr max-content;
 	grid-template-rows: 25px min-content min-content;
 	padding-bottom: 6px;
-	margin-bottom: 15px;
+	margin-bottom: 11px;
 }
 .rustdoc-breadcrumbs {
 	grid-area: main-heading-breadcrumbs;
@@ -760,10 +762,6 @@ ul.block, .block li {
 	margin-bottom: 10px;
 }
 
-.rustdoc .example-wrap > pre {
-	border-radius: 6px;
-}
-
 /* For the last child of a div, the margin will be taken care of
 	by the margin-top of the next item. */
 .rustdoc .example-wrap:last-child {
@@ -849,6 +847,7 @@ ul.block, .block li {
 	flex-grow: 0;
 	grid-area: main-heading-sub-heading;
 	line-height: 1.25;
+	padding-bottom: 4px;
 }
 
 .main-heading rustdoc-toolbar, .main-heading .out-of-band {
@@ -863,6 +862,7 @@ rustdoc-toolbar {
 .docblock code, .docblock-short code,
 pre, .rustdoc.src .example-wrap {
 	background-color: var(--code-block-background-color);
+	border-radius: var(--code-block-border-radius);
 }
 
 #main-content {
@@ -1777,6 +1777,7 @@ a.tooltip:hover::after {
 }
 #settings-menu > a, #help-button > a, button#toggle-all-docs {
 	width: 80px;
+	border-radius: var(--toolbar-button-border-radius);
 }
 #sidebar-button > a {
 	background-color: var(--button-background-color);
@@ -1863,6 +1864,7 @@ button[disabled]#toggle-all-docs:hover {
 rustdoc-toolbar span.label {
 	font-size: 1rem;
 	flex-grow: 1;
+	padding-bottom: 4px;
 }
 
 #sidebar-button > a:before {
