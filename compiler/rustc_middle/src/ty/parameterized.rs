@@ -106,6 +106,7 @@ trivially_parameterized_over_tcx! {
     rustc_span::Span,
     rustc_span::Symbol,
     rustc_span::def_id::DefPathHash,
+    rustc_span::hygiene::SyntaxContextKey,
     rustc_span::hygiene::SyntaxContextData,
     rustc_span::symbol::Ident,
     rustc_type_ir::Variance,

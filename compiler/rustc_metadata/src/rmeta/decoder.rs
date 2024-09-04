@@ -468,15 +468,28 @@ impl<'a, 'tcx> SpanDecoder for DecodeContext<'a, 'tcx> {
         };
 
         let cname = cdata.root.name();
-        rustc_span::hygiene::decode_syntax_context(self, &cdata.hygiene_context, |_, id| {
-            debug!("SpecializedDecoder<SyntaxContext>: decoding {}", id);
-            cdata
-                .root
-                .syntax_contexts
-                .get(cdata, id)
-                .unwrap_or_else(|| panic!("Missing SyntaxContext {id:?} for crate {cname:?}"))
-                .decode((cdata, sess))
-        })
+        rustc_span::hygiene::decode_syntax_context(
+            self,
+            &cdata.hygiene_context,
+            |_, id| {
+                debug!("SpecializedDecoder<SyntaxContextKey>: decoding {}", id);
+                cdata
+                    .root
+                    .syntax_context_keys
+                    .get(cdata, id)
+                    .unwrap_or_else(|| panic!("Missing SyntaxContext {id:?} for crate {cname:?}"))
+                    .decode((cdata, sess))
+            },
+            |_, id| {
+                debug!("SpecializedDecoder<SyntaxContextData>: decoding {}", id);
+                cdata
+                    .root
+                    .syntax_context_data
+                    .get(cdata, id)
+                    .unwrap_or_else(|| panic!("Missing SyntaxContext {id:?} for crate {cname:?}"))
+                    .decode((cdata, sess))
+            },
+        )
     }
 
     fn decode_expn_id(&mut self) -> ExpnId {
