@@ -621,6 +621,16 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
         self.unsatisfied_predicates.borrow_mut().clear();
     }
 
+    /// When we're looking up a method by path (UFCS), we relate the receiver
+    /// types invariantly. When we are looking up a method by the `.` operator,
+    /// we relate them covariantly.
+    fn variance(&self) -> ty::Variance {
+        match self.mode {
+            Mode::MethodCall => ty::Covariant,
+            Mode::Path => ty::Invariant,
+        }
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     // CANDIDATE ASSEMBLY
 
@@ -1443,7 +1453,8 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
                     (xform_self_ty, xform_ret_ty) =
                         self.xform_self_ty(probe.item, impl_ty, impl_args);
                     xform_self_ty = ocx.normalize(cause, self.param_env, xform_self_ty);
-                    match ocx.sup(cause, self.param_env, xform_self_ty, self_ty) {
+                    match ocx.relate(cause, self.param_env, self.variance(), self_ty, xform_self_ty)
+                    {
                         Ok(()) => {}
                         Err(err) => {
                             debug!("--> cannot relate self-types {:?}", err);
@@ -1515,7 +1526,13 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
                         {
                             return ProbeResult::NoMatch;
                         }
-                        _ => match ocx.sup(cause, self.param_env, xform_self_ty, self_ty) {
+                        _ => match ocx.relate(
+                            cause,
+                            self.param_env,
+                            self.variance(),
+                            self_ty,
+                            xform_self_ty,
+                        ) {
                             Ok(()) => {}
                             Err(err) => {
                                 debug!("--> cannot relate self-types {:?}", err);
@@ -1561,7 +1578,8 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
                     (xform_self_ty, xform_ret_ty) =
                         self.xform_self_ty(probe.item, trait_ref.self_ty(), trait_ref.args);
                     xform_self_ty = ocx.normalize(cause, self.param_env, xform_self_ty);
-                    match ocx.sup(cause, self.param_env, xform_self_ty, self_ty) {
+                    match ocx.relate(cause, self.param_env, self.variance(), self_ty, xform_self_ty)
+                    {
                         Ok(()) => {}
                         Err(err) => {
                             debug!("--> cannot relate self-types {:?}", err);
@@ -1604,7 +1622,7 @@ impl<'a, 'tcx> ProbeContext<'a, 'tcx> {
                 }
 
                 debug!("comparing return_ty {:?} with xform ret ty {:?}", return_ty, xform_ret_ty);
-                match ocx.sup(cause, self.param_env, return_ty, xform_ret_ty) {
+                match ocx.relate(cause, self.param_env, self.variance(), xform_ret_ty, return_ty) {
                     Ok(()) => {}
                     Err(_) => {
                         result = ProbeResult::BadReturnType;
