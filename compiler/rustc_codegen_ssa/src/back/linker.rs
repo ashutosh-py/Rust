@@ -7,7 +7,9 @@ use std::{env, iter, mem, str};
 
 use cc::windows_registry;
 use rustc_hir::def_id::{CrateNum, LOCAL_CRATE};
-use rustc_metadata::{find_native_static_library, try_find_native_static_library};
+use rustc_metadata::{
+    find_native_dynamic_library, find_native_static_library, try_find_native_static_library,
+};
 use rustc_middle::bug;
 use rustc_middle::middle::dependency_format::Linkage;
 use rustc_middle::middle::exported_symbols;
@@ -854,6 +856,11 @@ pub struct MsvcLinker<'a> {
     sess: &'a Session,
 }
 
+impl MsvcLinker<'_> {
+    // FIXME this duplicates rustc_metadata::find_native_static_library,
+    // as the Meson/MinGW suffix for import libraries can differ
+}
+
 impl<'a> Linker for MsvcLinker<'a> {
     fn cmd(&mut self) -> &mut Command {
         &mut self.cmd
@@ -878,15 +885,22 @@ impl<'a> Linker for MsvcLinker<'a> {
     }
 
     fn link_dylib_by_name(&mut self, name: &str, verbatim: bool, _as_needed: bool) {
-        self.link_arg(format!("{}{}", name, if verbatim { "" } else { ".lib" }));
+        // On MSVC-like targets rustc supports static libraries using alternative naming
+        // scheme (`libfoo.a`) unsupported by linker, search for such libraries manually.
+        let path = find_native_dynamic_library(name, verbatim, self.sess);
+        self.link_arg(path);
     }
 
     fn link_dylib_by_path(&mut self, path: &Path, _as_needed: bool) {
         // When producing a dll, MSVC linker may not emit an implib file if the dll doesn't export
         // any symbols, so we skip linking if the implib file is not present.
-        let implib_path = path.with_extension("dll.lib");
-        if implib_path.exists() {
-            self.link_or_cc_arg(implib_path);
+        let formats = [".dll.lib", ".dll.a"];
+        for extension in formats {
+            let implib_path = path.with_extension(extension);
+            if implib_path.exists() {
+                self.link_or_cc_arg(implib_path);
+                break;
+            }
         }
     }
 
