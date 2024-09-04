@@ -4,8 +4,9 @@ use smallvec::smallvec;
 
 use crate::data_structures::HashSet;
 use crate::inherent::*;
+use crate::lang_items::TraitSolverLangItem;
 use crate::outlives::{push_outlives_components, Component};
-use crate::{self as ty, Interner, Upcast as _};
+use crate::{self as ty, AliasTy, Interner, Upcast as _};
 
 /// "Elaboration" is the process of identifying all the predicates that
 /// are implied by a source predicate. Currently, this basically means
@@ -87,6 +88,55 @@ impl<I: Interner, O: Elaboratable<I>> Elaborator<I, O> {
                 // Negative trait bounds do not imply any supertrait bounds
                 if data.polarity != ty::PredicatePolarity::Positive {
                     return;
+                }
+
+                // N.B. this is a bit of a hack to get implied bounds for effects working..
+                if cx.is_lang_item(data.def_id(), TraitSolverLangItem::EffectsCompat)
+                    && matches!(self.mode, Filter::All)
+                {
+                    // first, ensure that the predicate we've got looks like a `<T as Tr>::Fx: EffectsCompat<somebool>`.
+                    // our plan is to gather information such that we elaborate into `<T as SuperTr>::Fx: EffectsCompat<somebool>`
+                    // when we know that `trait Tr: ~const SuperTr`.
+                    if let ty::Alias(ty::AliasTyKind::Projection, alias_ty) = data.self_ty().kind()
+                    {
+                        // look for effects-level bounds that look like `<Self as Tr>::Fx: TyCompat<<Self as SuperTr>::Fx>`,
+                        // which is proof to us that `Tr: ~const SuperTr`.
+                        let bounds = cx.explicit_implied_predicates_of(cx.parent(alias_ty.def_id));
+                        let expected_args_with_self =
+                            I::GenericArgs::identity_for_item(cx, alias_ty.def_id);
+                        let elaborated = bounds.iter_identity().filter_map(|(clause, _)| {
+                            let ty::ClauseKind::Trait(data2) = clause.kind().skip_binder() else {
+                                return None;
+                            };
+                            if !cx
+                                .is_lang_item(data2.def_id(), TraitSolverLangItem::EffectsTyCompat)
+                            {
+                                return None;
+                            };
+                            let ty2 = data2.trait_ref.args.type_at(1);
+                            let ty::Alias(ty::AliasTyKind::Projection, alias_ty2) = ty2.kind()
+                            else {
+                                return None;
+                            };
+                            if alias_ty2.args != expected_args_with_self {
+                                return None;
+                            };
+
+                            // important: create `<T as SuperTr>::Fx`, this will need to use the original `alias_ty`'s args
+                            // for the `T` as Self type.
+                            let alias_new =
+                                AliasTy::new_from_args(cx, alias_ty2.def_id, alias_ty.args);
+                            let alias =
+                                I::Ty::new_alias(cx, ty::AliasTyKind::Projection, alias_new);
+                            let mut data = data;
+                            let mut new_args = data.trait_ref.args.to_vec();
+                            new_args[0] = alias.into();
+                            data.trait_ref.args = cx.mk_args(&new_args);
+
+                            Some(elaboratable.child(bound_clause.rebind(data).upcast(cx)))
+                        });
+                        self.extend_deduped(elaborated);
+                    }
                 }
 
                 let map_to_child_clause =
