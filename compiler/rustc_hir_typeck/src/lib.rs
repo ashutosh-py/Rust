@@ -30,6 +30,7 @@ mod fallback;
 mod fn_ctxt;
 mod gather_locals;
 mod intrinsicck;
+mod lint;
 mod method;
 mod op;
 mod pat;
@@ -476,5 +477,6 @@ fn fatally_break_rust(tcx: TyCtxt<'_>, span: Span) -> ! {
 
 pub fn provide(providers: &mut Providers) {
     method::provide(providers);
+    lint::provide(providers);
     *providers = Providers { typeck, diagnostic_only_typeck, used_trait_imports, ..*providers };
 }

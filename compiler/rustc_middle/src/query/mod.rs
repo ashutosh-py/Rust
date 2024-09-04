@@ -26,7 +26,7 @@ use rustc_hir::def_id::{
     CrateNum, DefId, DefIdMap, DefIdSet, LocalDefId, LocalDefIdMap, LocalDefIdSet, LocalModDefId,
 };
 use rustc_hir::lang_items::{LangItem, LanguageItems};
-use rustc_hir::{Crate, ItemLocalId, ItemLocalMap, TraitCandidate};
+use rustc_hir::{Crate, HirIdSet, ItemLocalId, ItemLocalMap, TraitCandidate};
 use rustc_index::IndexVec;
 use rustc_macros::rustc_queries;
 use rustc_query_system::ich::StableHashingContext;
@@ -2273,6 +2273,10 @@ rustc_queries! {
     query cross_crate_inlinable(def_id: DefId) -> bool {
         desc { "whether the item should be made inlinable across crates" }
         separate_provide_extern
+    }
+
+    query extract_tail_expr_consuming_nodes(def_id: DefId) -> &'tcx HirIdSet {
+        desc { "extract hir nodes that consumes value" }
     }
 }
 

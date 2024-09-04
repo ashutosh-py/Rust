@@ -767,8 +767,8 @@ lint_suspicious_double_ref_clone =
 lint_suspicious_double_ref_deref =
     using `.deref()` on a double reference, which returns `{$ty}` instead of dereferencing the inner type
 
-lint_tail_expr_drop_order = these values and local bindings have significant drop implementation that will have a different drop order from that of Edition 2021
-    .label = these values have significant drop implementation and will observe changes in drop order under Edition 2024
+lint_tail_expr_drop_order = this value of type `{$ty}` has significant drop implementation that will have a different drop order from that of Edition 2021
+    .label = these local bindings with significant drop implementation may observe changes in drop order under Edition 2024
 
 lint_trailing_semi_macro = trailing semicolon in macro used in expression position
     .note1 = macro invocations at the end of a block are treated as expressions
