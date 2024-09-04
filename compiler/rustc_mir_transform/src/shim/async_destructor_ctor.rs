@@ -429,6 +429,8 @@ impl<'tcx> AsyncDestructorCtorShimBuilder<'tcx> {
                                         UnwindTerminateReason::InCleanup,
                                     ),
                                     replace: false,
+                                    drop: None,
+                                    async_fut: None,
                                 }
                             } else {
                                 TerminatorKind::Goto { target: *top_cleanup_bb }
