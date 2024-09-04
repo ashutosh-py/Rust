@@ -1,10 +1,11 @@
 extern crate dep_2_reexport;
 extern crate dependency;
-use dep_2_reexport::Type;
+use dep_2_reexport::{OtherType, Type};
 use dependency::{do_something, Trait};
 
 fn main() {
     do_something(Type);
     Type.foo();
     Type::bar();
+    do_something(OtherType);
 }
