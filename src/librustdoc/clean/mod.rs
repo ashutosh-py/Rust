@@ -2349,7 +2349,7 @@ fn clean_middle_opaque_bounds<'tcx>(
     ImplTrait(bounds)
 }
 
-pub(crate) fn clean_field<'tcx>(field: &hir::FieldDef<'tcx>, cx: &mut DocContext<'tcx>) -> Item {
+pub(crate) fn clean_field<'tcx>(field: &hir::FieldDef, cx: &mut DocContext<'tcx>) -> Item {
     clean_field_with_def_id(field.def_id.to_def_id(), field.ident.name, clean_ty(field.ty, cx), cx)
 }
 

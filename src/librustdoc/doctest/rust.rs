@@ -194,7 +194,7 @@ impl<'a, 'tcx> intravisit::Visitor<'tcx> for HirCollector<'a, 'tcx> {
         });
     }
 
-    fn visit_field_def(&mut self, f: &'tcx hir::FieldDef<'_>) {
+    fn visit_field_def(&mut self, f: &'tcx hir::FieldDef) {
         self.visit_testable(f.ident.to_string(), f.def_id, f.span, |this| {
             intravisit::walk_field_def(this, f);
         });

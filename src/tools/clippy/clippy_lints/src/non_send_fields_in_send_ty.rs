@@ -154,7 +154,7 @@ impl<'tcx> LateLintPass<'tcx> for NonSendFieldInSendTy {
 }
 
 struct NonSendField<'tcx> {
-    def: &'tcx FieldDef<'tcx>,
+    def: &'tcx FieldDef,
     ty: Ty<'tcx>,
     generic_params: Vec<Ty<'tcx>>,
 }
