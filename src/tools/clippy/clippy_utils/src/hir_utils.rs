@@ -1115,9 +1115,9 @@ impl<'a, 'tcx> SpanlessHash<'a, 'tcx> {
                 }
             },
             TyKind::Path(ref qpath) => self.hash_qpath(qpath),
-            TyKind::OpaqueDef(_, arg_list, in_trait) => {
+            TyKind::OpaqueDef(opaque, arg_list) => {
                 self.hash_generic_args(arg_list);
-                in_trait.hash(&mut self.s);
+                opaque.in_trait.hash(&mut self.s);
             },
             TyKind::TraitObject(_, lifetime, _) => {
                 self.hash_lifetime(lifetime);

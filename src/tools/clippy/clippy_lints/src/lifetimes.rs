@@ -5,7 +5,7 @@ use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_errors::Applicability;
 use rustc_hir::intravisit::nested_filter::{self as hir_nested_filter, NestedFilter};
 use rustc_hir::intravisit::{
-    walk_fn_decl, walk_generic_param, walk_generics, walk_impl_item_ref, walk_item, walk_param_bound,
+    walk_fn_decl, walk_generic_param, walk_generics, walk_impl_item_ref, walk_param_bound,
     walk_poly_trait_ref, walk_trait_ref, walk_ty, Visitor,
 };
 use rustc_hir::FnRetTy::Return;
@@ -523,11 +523,9 @@ impl<'a, 'tcx> Visitor<'tcx> for RefVisitor<'a, 'tcx> {
 
     fn visit_ty(&mut self, ty: &'tcx Ty<'_>) {
         match ty.kind {
-            TyKind::OpaqueDef(item, bounds, _) => {
-                let map = self.cx.tcx.hir();
-                let item = map.item(item);
+            TyKind::OpaqueDef(opaque, bounds) => {
                 let len = self.lts.len();
-                walk_item(self, item);
+                self.visit_opaque_ty(opaque);
                 self.lts.truncate(len);
                 self.lts.extend(bounds.iter().filter_map(|bound| match bound {
                     GenericArg::Lifetime(&l) => Some(l),
