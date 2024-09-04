@@ -232,6 +232,74 @@ pub fn postorder<'a, 'tcx>(
     reverse_postorder(body).rev()
 }
 
+struct MonoReachablePostorder<'a, 'tcx> {
+    basic_blocks: &'a IndexSlice<BasicBlock, BasicBlockData<'tcx>>,
+    visited: BitSet<BasicBlock>,
+    visit_stack: Vec<(BasicBlock, Successors<'a>)>,
+    tcx: TyCtxt<'tcx>,
+    instance: Instance<'tcx>,
+}
+
+impl<'a, 'tcx> MonoReachablePostorder<'a, 'tcx> {
+    fn new(
+        body: &'a Body<'tcx>,
+        tcx: TyCtxt<'tcx>,
+        instance: Instance<'tcx>,
+    ) -> MonoReachablePostorder<'a, 'tcx> {
+        let basic_blocks = &body.basic_blocks;
+        let mut po = MonoReachablePostorder {
+            basic_blocks,
+            visited: BitSet::new_empty(basic_blocks.len()),
+            visit_stack: Vec::new(),
+            tcx,
+            instance,
+        };
+
+        po.visit(START_BLOCK);
+        po.traverse_successor();
+        po
+    }
+
+    fn visit(&mut self, bb: BasicBlock) {
+        if !self.visited.insert(bb) {
+            return;
+        }
+        let data = &self.basic_blocks[bb];
+        let successors = data.mono_successors(self.tcx, self.instance);
+        self.visit_stack.push((bb, successors));
+    }
+
+    fn traverse_successor(&mut self) {
+        while let Some(bb) = self.visit_stack.last_mut().and_then(|(_, iter)| iter.next_back()) {
+            self.visit(bb);
+        }
+    }
+}
+
+impl<'tcx> Iterator for MonoReachablePostorder<'_, 'tcx> {
+    type Item = BasicBlock;
+
+    fn next(&mut self) -> Option<BasicBlock> {
+        let (bb, _) = self.visit_stack.pop()?;
+        self.traverse_successor();
+        Some(bb)
+    }
+}
+
+pub fn mono_reachable_reverse_postorder<'a, 'tcx>(
+    body: &'a Body<'tcx>,
+    tcx: TyCtxt<'tcx>,
+    instance: Instance<'tcx>,
+) -> Vec<BasicBlock> {
+    let mut iter = MonoReachablePostorder::new(body, tcx, instance);
+    let mut items = Vec::with_capacity(body.basic_blocks.len());
+    while let Some(block) = iter.next() {
+        items.push(block);
+    }
+    items.reverse();
+    items
+}
+
 /// Returns an iterator over all basic blocks reachable from the `START_BLOCK` in no particular
 /// order.
 ///
@@ -358,14 +426,8 @@ impl<'a, 'tcx> Iterator for MonoReachable<'a, 'tcx> {
 
             let data = &self.body[idx];
 
-            if let Some((bits, targets)) =
-                Body::try_const_mono_switchint(self.tcx, self.instance, data)
-            {
-                let target = targets.target_for_value(bits);
-                self.add_work([target]);
-            } else {
-                self.add_work(data.terminator().successors());
-            }
+            let targets = data.mono_successors(self.tcx, self.instance);
+            self.add_work(targets);
 
             return Some((idx, data));
         }
