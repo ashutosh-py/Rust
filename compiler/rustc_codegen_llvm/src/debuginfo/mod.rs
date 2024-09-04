@@ -11,6 +11,7 @@ use rustc_codegen_ssa::mir::debuginfo::{DebugScope, FunctionDebugContext, Variab
 use rustc_codegen_ssa::traits::*;
 use rustc_data_structures::sync::Lrc;
 use rustc_data_structures::unord::UnordMap;
+use rustc_hir::def::DefKind;
 use rustc_hir::def_id::{DefId, DefIdMap};
 use rustc_index::IndexVec;
 use rustc_middle::mir;
@@ -332,8 +333,15 @@ impl<'ll, 'tcx> DebugInfoMethods<'tcx> for CodegenCx<'ll, 'tcx> {
         let mut name = String::with_capacity(64);
         type_names::push_item_name(tcx, def_id, false, &mut name);
 
-        // Find the enclosing function, in case this is a closure.
-        let enclosing_fn_def_id = tcx.typeck_root_def_id(def_id);
+        // Find the enclosing function, in case this is a closure, coroutine,
+        // coroutine-closure, or synthetic MIR body.
+        let mut enclosing_fn_def_id = def_id;
+        while matches!(
+            tcx.def_kind(enclosing_fn_def_id),
+            DefKind::Closure | DefKind::SyntheticCoroutineBody
+        ) {
+            enclosing_fn_def_id = tcx.parent(enclosing_fn_def_id);
+        }
 
         // We look up the generics of the enclosing function and truncate the args
         // to their length in order to cut off extra stuff that might be in there for

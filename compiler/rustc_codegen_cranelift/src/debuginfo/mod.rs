@@ -198,8 +198,15 @@ impl DebugContext {
         let mut name = String::new();
         type_names::push_item_name(tcx, instance.def_id(), false, &mut name);
 
-        // Find the enclosing function, in case this is a closure.
-        let enclosing_fn_def_id = tcx.typeck_root_def_id(instance.def_id());
+        // Find the enclosing function, in case this is a closure, coroutine,
+        // coroutine-closure, or synthetic MIR body.
+        let mut enclosing_fn_def_id = instance.def_id();
+        while matches!(
+            tcx.def_kind(enclosing_fn_def_id),
+            DefKind::Closure | DefKind::SyntheticCoroutineBody
+        ) {
+            enclosing_fn_def_id = tcx.parent(enclosing_fn_def_id);
+        }
 
         // We look up the generics of the enclosing function and truncate the args
         // to their length in order to cut off extra stuff that might be in there for
