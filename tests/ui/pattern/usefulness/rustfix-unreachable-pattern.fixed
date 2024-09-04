@@ -1,0 +1,22 @@
+//@ run-rustfix
+#![feature(never_patterns)]
+#![deny(unreachable_patterns)]
+#![allow(incomplete_features)]
+
+enum Void {}
+
+#[rustfmt::skip]
+fn main() {
+    let res: Result<(), Void> = Ok(());
+    match res {
+        Ok(_) => {}
+         //~ ERROR unreachable
+         //~ ERROR unreachable
+    }
+
+    match res {
+        Ok(_x) => {}
+         //~ ERROR unreachable
+         //~ ERROR unreachable
+    }
+}
