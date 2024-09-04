@@ -1584,7 +1584,7 @@ impl<T: ?Sized> *mut T {
     ///
     /// ```
     /// #![feature(const_pointer_is_aligned)]
-    /// #![feature(const_mut_refs)]
+    /// # #![cfg_attr(bootstrap, feature(const_mut_refs))]
     ///
     /// // On some platforms, the alignment of primitives is less than their size.
     /// #[repr(align(4))]
@@ -1710,7 +1710,7 @@ impl<T: ?Sized> *mut T {
     /// ```
     /// #![feature(pointer_is_aligned_to)]
     /// #![feature(const_pointer_is_aligned)]
-    /// #![feature(const_mut_refs)]
+    /// # #![cfg_attr(bootstrap, feature(const_mut_refs))]
     ///
     /// // On some platforms, the alignment of i32 is less than 4.
     /// #[repr(align(4))]

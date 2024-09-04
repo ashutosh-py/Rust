@@ -1,6 +1,5 @@
 #![feature(core_intrinsics)]
 #![feature(const_heap)]
-#![feature(const_mut_refs)]
 #![deny(const_eval_mutable_ptr_in_final_value)]
 use std::intrinsics;
 

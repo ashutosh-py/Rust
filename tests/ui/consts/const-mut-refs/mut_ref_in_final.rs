@@ -1,5 +1,3 @@
-#![feature(const_mut_refs)]
-
 const NULL: *mut i32 = std::ptr::null_mut();
 const A: *const i32 = &4;
 
@@ -22,6 +20,14 @@ const B4: Option<&mut i32> = helper(&mut 42); //~ ERROR temporary value dropped 
 const C: *const i32 = &{
     let mut x = 42;
     x += 3;
+    x
+};
+
+// Still ok, since `x` will be moved before the final pointer is crated,
+// so `_ref` doesn't actually point to the memory that escapes.
+const C_NO: *const i32 = &{
+    let mut x = 42;
+    let _ref = &mut x;
     x
 };
 
