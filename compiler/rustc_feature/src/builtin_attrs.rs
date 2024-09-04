@@ -756,6 +756,12 @@ pub const BUILTIN_ATTRIBUTES: &[BuiltinAttribute] = &[
         template!(NameValueStr: "transparent|semitransparent|opaque"), ErrorFollowing,
         EncodeCrossCrate::Yes, "used internally for testing macro hygiene",
     ),
+    // TODO(ZuseZ4): What does cross crate actually mean here?
+    rustc_attr!(
+        rustc_autodiff, Normal,
+        template!(Word, List: r#""...""#), DuplicatesOk,
+        EncodeCrossCrate::Yes, INTERNAL_UNSTABLE
+    ),
 
     // ==========================================================================
     // Internal attributes, Diagnostics related:
