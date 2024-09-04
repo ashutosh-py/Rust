@@ -9,8 +9,8 @@ use rustc_data_structures::fx::{FxHashMap, FxIndexMap, FxIndexSet};
 use rustc_data_structures::sync::{AppendOnlyVec, Lock, Lrc};
 use rustc_errors::emitter::{stderr_destination, HumanEmitter, SilentEmitter};
 use rustc_errors::{
-    fallback_fluent_bundle, ColorConfig, Diag, DiagCtxt, DiagCtxtHandle, DiagMessage,
-    EmissionGuarantee, MultiSpan, StashKey,
+    fallback_fluent_bundle, ColorConfig, Diag, DiagCtxt, DiagCtxtHandle, DiagMessage, MultiSpan,
+    StashKey,
 };
 use rustc_feature::{find_feature_issue, GateIssue, UnstableFeatures};
 use rustc_span::edition::Edition;
@@ -20,8 +20,8 @@ use rustc_span::{Span, Symbol};
 
 use crate::config::{Cfg, CheckCfg};
 use crate::errors::{
-    CliFeatureDiagnosticHelp, FeatureDiagnosticForIssue, FeatureDiagnosticHelp,
-    FeatureDiagnosticSuggestion, FeatureGateError, SuggestUpgradeCompiler,
+    EnableFeatureSubdiagnostic, FeatureDiagnosticForIssue, FeatureGateError,
+    FeatureGateSubdiagnostic, SuggestUpgradeCompiler,
 };
 use crate::lint::builtin::UNSTABLE_SYNTAX_PRE_EXPANSION;
 use crate::lint::{BufferedEarlyLint, BuiltinLintDiag, Lint, LintId};
@@ -111,9 +111,9 @@ pub fn feature_err_issue(
         }
     }
 
-    let mut err = sess.dcx().create_err(FeatureGateError { span, explain: explain.into() });
-    add_feature_diagnostics_for_issue(&mut err, sess, feature, issue, false, None);
-    err
+    let subdiag = get_feature_diagnostics_for_issue(sess, feature, issue, false, None);
+
+    sess.dcx().create_err(FeatureGateError { span, explain: explain.into(), subdiag })
 }
 
 /// Construct a future incompatibility diagnostic for a feature gate.
@@ -141,7 +141,7 @@ pub fn feature_warn_issue(
     explain: &'static str,
 ) {
     let mut err = sess.dcx().struct_span_warn(span, explain);
-    add_feature_diagnostics_for_issue(&mut err, sess, feature, issue, false, None);
+    err.subdiagnostic(get_feature_diagnostics_for_issue(sess, feature, issue, false, None));
 
     // Decorate this as a future-incompatibility lint as in rustc_middle::lint::lint_level
     let lint = UNSTABLE_SYNTAX_PRE_EXPANSION;
@@ -154,49 +154,49 @@ pub fn feature_warn_issue(
     err.stash(span, StashKey::EarlySyntaxWarning);
 }
 
-/// Adds the diagnostics for a feature to an existing error.
-pub fn add_feature_diagnostics<G: EmissionGuarantee>(
-    err: &mut Diag<'_, G>,
-    sess: &Session,
-    feature: Symbol,
-) {
-    add_feature_diagnostics_for_issue(err, sess, feature, GateIssue::Language, false, None);
+/// Returns the subdiagnostics for a feature gate error.
+pub fn get_feature_diagnostics(sess: &Session, feature: Symbol) -> FeatureGateSubdiagnostic {
+    get_feature_diagnostics_for_issue(sess, feature, GateIssue::Language, false, None)
 }
 
-/// Adds the diagnostics for a feature to an existing error.
+/// Returns the subdiagnostics for a feature gate error.
 ///
 /// This variant allows you to control whether it is a library or language feature.
 /// Almost always, you want to use this for a language feature. If so, prefer
-/// `add_feature_diagnostics`.
-#[allow(rustc::diagnostic_outside_of_impl)] // FIXME
-pub fn add_feature_diagnostics_for_issue<G: EmissionGuarantee>(
-    err: &mut Diag<'_, G>,
+/// [`get_feature_diagnostics`].
+pub fn get_feature_diagnostics_for_issue(
     sess: &Session,
     feature: Symbol,
     issue: GateIssue,
     feature_from_cli: bool,
     inject_span: Option<Span>,
-) {
-    if let Some(n) = find_feature_issue(feature, issue) {
-        err.subdiagnostic(FeatureDiagnosticForIssue { n });
-    }
+) -> FeatureGateSubdiagnostic {
+    let issue = find_feature_issue(feature, issue).map(|n| FeatureDiagnosticForIssue { n });
 
     // #23973: do not suggest `#![feature(...)]` if we are in beta/stable
-    if sess.psess.unstable_features.is_nightly_build() {
-        if feature_from_cli {
-            err.subdiagnostic(CliFeatureDiagnosticHelp { feature });
+    let (enable_feature, upgrade_compiler) = if sess.psess.unstable_features.is_nightly_build() {
+        let enable_feature = if feature_from_cli {
+            EnableFeatureSubdiagnostic::AddCliHelp { feature }
         } else if let Some(span) = inject_span {
-            err.subdiagnostic(FeatureDiagnosticSuggestion { feature, span });
+            EnableFeatureSubdiagnostic::AddAttrSuggestion { feature, span }
         } else {
-            err.subdiagnostic(FeatureDiagnosticHelp { feature });
-        }
+            EnableFeatureSubdiagnostic::AddAttrHelp { feature }
+        };
 
-        if sess.opts.unstable_opts.ui_testing {
-            err.subdiagnostic(SuggestUpgradeCompiler::ui_testing());
+        let upgrade_compiler = if sess.opts.unstable_opts.ui_testing {
+            Some(SuggestUpgradeCompiler::ui_testing())
         } else if let Some(suggestion) = SuggestUpgradeCompiler::new() {
-            err.subdiagnostic(suggestion);
-        }
-    }
+            Some(suggestion)
+        } else {
+            None
+        };
+
+        (Some(enable_feature), upgrade_compiler)
+    } else {
+        (None, None)
+    };
+
+    FeatureGateSubdiagnostic { issue, upgrade_compiler, enable_feature }
 }
 
 /// Info about a parsing session.

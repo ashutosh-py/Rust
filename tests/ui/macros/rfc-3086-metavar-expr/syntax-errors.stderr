@@ -3,7 +3,7 @@ error: unexpected token: $
    |
 LL |     ( $$ $a:ident ) => {
    |        ^
-
+   |
 note: `$$` and meta-variable expressions are not allowed inside macro parameter definitions
   --> $DIR/syntax-errors.rs:50:8
    |
@@ -141,7 +141,7 @@ error: unexpected token: {
    |
 LL |     ( ${ len() } ) => {
    |        ^^^^^^^^^
-
+   |
 note: `$$` and meta-variable expressions are not allowed inside macro parameter definitions
   --> $DIR/syntax-errors.rs:92:8
    |
@@ -160,7 +160,7 @@ error: meta-variables within meta-variable expressions must be referenced using 
 LL |     ( $( $i:ident ),* ) => { ${ ignore() } };
    |                                 ^^^^^^
 
-error: only unsuffixes integer literals are supported in meta-variable expressions
+error: only unsuffixed integer literals are supported in meta-variable expressions
   --> $DIR/syntax-errors.rs:105:33
    |
 LL |     ( $( $i:ident ),* ) => { ${ index(1u32) } };
@@ -188,7 +188,9 @@ error: unrecognized meta-variable expression
   --> $DIR/syntax-errors.rs:140:33
    |
 LL |     ( $( $i:ident ),* ) => { ${ aaaaaaaaaaaaaa(i) } };
-   |                                 ^^^^^^^^^^^^^^ help: supported expressions are count, ignore, index and len
+   |                                 ^^^^^^^^^^^^^^
+   |
+   = help: supported expressions are count, ignore, index and len
 
 error: expected identifier or string literal
   --> $DIR/syntax-errors.rs:118:33
