@@ -508,15 +508,13 @@ where
         &self,
         local: mir::Local,
     ) -> InterpResult<'tcx, PlaceTy<'tcx, M::Provenance>> {
-        // Other parts of the system rely on `Place::Local` never being unsized.
-        // So we eagerly check here if this local has an MPlace, and if yes we use it.
         let frame = self.frame();
         let layout = self.layout_of_local(frame, local, None)?;
         let place = if layout.is_sized() {
             // We can just always use the `Local` for sized values.
             Place::Local { local, offset: None, locals_addr: frame.locals_addr() }
         } else {
-            // Unsized `Local` isn't okay (we cannot store the metadata).
+            // Other parts of the system rely on `Place::Local` never being unsized.
             match frame.locals[local].access()? {
                 Operand::Immediate(_) => bug!(),
                 Operand::Indirect(mplace) => Place::Ptr(*mplace),
@@ -628,6 +626,8 @@ where
                         Operand::Immediate(local_val) => {
                             // Local can be updated in-place.
                             *local_val = src;
+                            // Call the machine hook (the data race detector needs to know about this write).
+                            M::after_local_write(self, local, /*storage_live*/ false)?;
                             // Double-check that the value we are storing and the local fit to each other.
                             // (*After* doing the update for borrow checker reasons.)
                             if cfg!(debug_assertions) {
@@ -946,7 +946,7 @@ where
                                 mplace.mplace,
                             )?;
                         }
-                        M::after_local_allocated(self, local, &mplace)?;
+                        M::after_local_moved_to_memory(self, local, &mplace)?;
                         // Now we can call `access_mut` again, asserting it goes well, and actually
                         // overwrite things. This points to the entire allocation, not just the part
                         // the place refers to, i.e. we do this before we apply `offset`.
