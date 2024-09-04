@@ -8,7 +8,9 @@ use rustc_hir::def::{CtorKind, DefKind};
 use rustc_hir::Node;
 use rustc_infer::infer::{RegionVariableOrigin, TyCtxtInferExt};
 use rustc_infer::traits::Obligation;
-use rustc_lint_defs::builtin::REPR_TRANSPARENT_EXTERNAL_PRIVATE_FIELDS;
+use rustc_lint_defs::builtin::{
+    REPR_TRANSPARENT_EXTERNAL_PRIVATE_FIELDS, UNSUPPORTED_FN_PTR_CALLING_CONVENTIONS,
+};
 use rustc_middle::middle::resolve_bound_vars::ResolvedArg;
 use rustc_middle::middle::stability::EvalResult;
 use rustc_middle::span_bug;
@@ -48,6 +50,19 @@ pub fn check_abi(tcx: TyCtxt<'_>, hir_id: hir::HirId, span: Span, abi: Abi) {
         None => {
             tcx.node_span_lint(UNSUPPORTED_CALLING_CONVENTIONS, hir_id, span, |lint| {
                 lint.primary_message("use of calling convention not supported on this target");
+            });
+        }
+    }
+}
+
+pub fn check_abi_fn_ptr(tcx: TyCtxt<'_>, hir_id: hir::HirId, span: Span, abi: Abi) {
+    match tcx.sess.target.is_abi_supported(abi) {
+        Some(true) => (),
+        Some(false) | None => {
+            tcx.node_span_lint(UNSUPPORTED_FN_PTR_CALLING_CONVENTIONS, hir_id, span, |lint| {
+                lint.primary_message(
+                    "use of calling convention not supported on this target on function pointer",
+                );
             });
         }
     }
