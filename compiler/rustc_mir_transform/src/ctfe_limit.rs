@@ -10,7 +10,7 @@ use tracing::instrument;
 
 use crate::MirPass;
 
-pub struct CtfeLimit;
+pub(super) struct CtfeLimit;
 
 impl<'tcx> MirPass<'tcx> for CtfeLimit {
     #[instrument(skip(self, _tcx, body))]

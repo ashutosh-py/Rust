@@ -32,9 +32,9 @@ pub(crate) mod cycle;
 
 const TOP_DOWN_DEPTH_LIMIT: usize = 5;
 
-pub struct Inline;
+pub(super) struct Inline;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 struct CallSite<'tcx> {
     callee: Instance<'tcx>,
     fn_sig: ty::PolyFnSig<'tcx>,
@@ -156,7 +156,6 @@ impl<'tcx> Inliner<'tcx> {
             match self.try_inlining(caller_body, &callsite) {
                 Err(reason) => {
                     debug!("not-inlined {} [{}]", callsite.callee, reason);
-                    continue;
                 }
                 Ok(new_blocks) => {
                     debug!("inlined {}", callsite.callee);
@@ -638,7 +637,7 @@ impl<'tcx> Inliner<'tcx> {
             );
             let dest_ty = dest.ty(caller_body, self.tcx);
             let temp =
-                Place::from(self.new_call_temp(caller_body, &callsite, dest_ty, return_block));
+                Place::from(self.new_call_temp(caller_body, callsite, dest_ty, return_block));
             caller_body[callsite.block].statements.push(Statement {
                 source_info: callsite.source_info,
                 kind: StatementKind::Assign(Box::new((temp, dest))),
@@ -657,7 +656,7 @@ impl<'tcx> Inliner<'tcx> {
                 true,
                 self.new_call_temp(
                     caller_body,
-                    &callsite,
+                    callsite,
                     destination.ty(caller_body, self.tcx).ty,
                     return_block,
                 ),
@@ -665,7 +664,7 @@ impl<'tcx> Inliner<'tcx> {
         };
 
         // Copy the arguments if needed.
-        let args = self.make_call_args(args, &callsite, caller_body, &callee_body, return_block);
+        let args = self.make_call_args(args, callsite, caller_body, &callee_body, return_block);
 
         let mut integrator = Integrator {
             args: &args,

@@ -16,7 +16,7 @@ use crate::MirPass;
 /// like [#90770].
 ///
 /// [#90770]: https://github.com/rust-lang/rust/issues/90770
-pub struct RemoveUninitDrops;
+pub(super) struct RemoveUninitDrops;
 
 impl<'tcx> MirPass<'tcx> for RemoveUninitDrops {
     fn run_pass(&self, tcx: TyCtxt<'tcx>, body: &mut Body<'tcx>) {

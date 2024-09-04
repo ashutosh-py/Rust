@@ -1,4 +1,4 @@
-pub mod query;
+pub(super) mod query;
 
 mod counters;
 mod graph;
@@ -33,7 +33,7 @@ use crate::MirPass;
 /// Inserts `StatementKind::Coverage` statements that either instrument the binary with injected
 /// counters, via intrinsic `llvm.instrprof.increment`, and/or inject metadata used during codegen
 /// to construct the coverage map.
-pub struct InstrumentCoverage;
+pub(super) struct InstrumentCoverage;
 
 impl<'tcx> MirPass<'tcx> for InstrumentCoverage {
     fn is_enabled(&self, sess: &rustc_session::Session) -> bool {

@@ -11,7 +11,7 @@ use rustc_target::spec::abi::Abi;
 
 use crate::{errors, MirLint};
 
-pub struct FunctionItemReferences;
+pub(super) struct FunctionItemReferences;
 
 impl<'tcx> MirLint<'tcx> for FunctionItemReferences {
     fn run_lint(&self, tcx: TyCtxt<'tcx>, body: &Body<'tcx>) {

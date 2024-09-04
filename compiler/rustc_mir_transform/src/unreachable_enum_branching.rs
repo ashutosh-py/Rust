@@ -14,7 +14,7 @@ use tracing::trace;
 
 use crate::MirPass;
 
-pub struct UnreachableEnumBranching;
+pub(super) struct UnreachableEnumBranching;
 
 fn get_discriminant_local(terminator: &TerminatorKind<'_>) -> Option<Local> {
     if let TerminatorKind::SwitchInt { discr: Operand::Move(p), .. } = terminator {

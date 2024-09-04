@@ -148,7 +148,7 @@ use tracing::{debug, trace};
 
 use crate::MirPass;
 
-pub struct DestinationPropagation;
+pub(super) struct DestinationPropagation;
 
 impl<'tcx> MirPass<'tcx> for DestinationPropagation {
     fn is_enabled(&self, sess: &rustc_session::Session) -> bool {
