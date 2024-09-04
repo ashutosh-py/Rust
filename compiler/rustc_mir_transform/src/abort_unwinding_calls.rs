@@ -52,12 +52,22 @@ impl<'tcx> MirPass<'tcx> for AbortUnwindingCalls {
         // example.
         let mut calls_to_terminate = Vec::new();
         let mut cleanups_to_remove = Vec::new();
+        let mut resumes_to_terminate = Vec::new();
         for (id, block) in body.basic_blocks.iter_enumerated() {
+            let Some(terminator) = &block.terminator else { continue };
+            let span = terminator.source_info.span;
+
+            // If we see an `UnwindResume` terminator inside a function that cannot unwind, we need
+            // to replace it with `UnwindAction::Terminate`.
+            if let TerminatorKind::UnwindResume = &terminator.kind
+                && !body_can_unwind
+            {
+                resumes_to_terminate.push(id);
+            }
+
             if block.is_cleanup {
                 continue;
             }
-            let Some(terminator) = &block.terminator else { continue };
-            let span = terminator.source_info.span;
 
             let call_can_unwind = match &terminator.kind {
                 TerminatorKind::Call { func, .. } => {
@@ -88,7 +98,7 @@ impl<'tcx> MirPass<'tcx> for AbortUnwindingCalls {
 
             // If this function call can't unwind, then there's no need for it
             // to have a landing pad. This means that we can remove any cleanup
-            // registered for it.
+            // registered for it (and turn it to `UnwindAction::Unreachable`).
             if !call_can_unwind {
                 cleanups_to_remove.push(id);
                 continue;
@@ -96,9 +106,11 @@ impl<'tcx> MirPass<'tcx> for AbortUnwindingCalls {
 
             // Otherwise if this function can unwind, then if the outer function
             // can also unwind there's nothing to do. If the outer function
-            // can't unwind, however, we need to change the landing pad for this
-            // function call to one that aborts.
-            if !body_can_unwind {
+            // can't unwind, however, we need to ensure that any `UnwindAction::Continue`
+            // is replaced with terminate. For those with `UnwindAction::Cleanup`,
+            // cleanup will still happen, and terminate will happen afterwards handled by
+            // `resumes_to_terminate`.
+            if !body_can_unwind && matches!(terminator.unwind(), Some(UnwindAction::Continue)) {
                 calls_to_terminate.push(id);
             }
         }
@@ -111,6 +123,11 @@ impl<'tcx> MirPass<'tcx> for AbortUnwindingCalls {
         for id in cleanups_to_remove {
             let cleanup = body.basic_blocks_mut()[id].terminator_mut().unwind_mut().unwrap();
             *cleanup = UnwindAction::Unreachable;
+        }
+
+        for id in resumes_to_terminate {
+            let terminator = body.basic_blocks_mut()[id].terminator_mut();
+            terminator.kind = TerminatorKind::UnwindTerminate(UnwindTerminateReason::Abi);
         }
 
         // We may have invalidated some `cleanup` blocks so clean those up now.
