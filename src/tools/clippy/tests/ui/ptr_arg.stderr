@@ -6,6 +6,10 @@ LL |     fn cow_good_ret_ty<'a>(input: &'a Cow<'a, str>) -> &str {
    |
    = note: `-D elided-named-lifetimes` implied by `-D warnings`
    = help: to override `-D warnings` add `#[allow(elided_named_lifetimes)]`
+help: consider specifying it explicitly
+   |
+LL |     fn cow_good_ret_ty<'a>(input: &'a Cow<'a, str>) -> &'a str {
+   |                                                         ++
 
 error: writing `&Vec` instead of `&[_]` involves a new object where a slice will do
   --> tests/ui/ptr_arg.rs:13:14
