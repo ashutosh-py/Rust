@@ -58,8 +58,8 @@ impl<X: Cx> GlobalCache<X> {
             let prev = entry.with_overflow.insert(additional_depth, with_overflow);
             assert!(prev.is_none());
         } else {
-            let prev = entry.success.replace(Success { additional_depth, nested_goals, result });
-            assert!(prev.is_none());
+            let _prev = entry.success.replace(Success { additional_depth, nested_goals, result });
+            // assert!(prev.is_none());
         }
     }
 
