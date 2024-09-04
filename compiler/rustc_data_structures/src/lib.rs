@@ -22,6 +22,7 @@
 #![feature(auto_traits)]
 #![feature(cfg_match)]
 #![feature(core_intrinsics)]
+#![feature(dropck_eyepatch)]
 #![feature(extend_one)]
 #![feature(hash_raw_entry)]
 #![feature(macro_metavar_expr)]
@@ -78,6 +79,7 @@ pub mod temp_dir;
 pub mod transitive_relation;
 pub mod unhash;
 pub mod unord;
+pub mod vec_cache;
 pub mod work_queue;
 
 mod atomic_ref;
