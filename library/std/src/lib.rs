@@ -617,6 +617,15 @@ pub mod simd {
     #[doc(inline)]
     pub use crate::std_float::StdFloat;
 }
+#[cfg(not(bootstrap))]
+#[unstable(feature = "autodiff", issue = "12345")]
+mod autodiff {
+    pub use core::autodiff as autodiff;
+}
+#[cfg(not(bootstrap))]
+#[unstable(feature = "autodiff", issue = "12345")]
+pub use autodiff::autodiff;
+
 
 #[stable(feature = "futures_api", since = "1.36.0")]
 pub mod task {
