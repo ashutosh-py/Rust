@@ -80,7 +80,9 @@ fn add_move_for_packed_drop<'tcx>(
     is_cleanup: bool,
 ) {
     debug!("add_move_for_packed_drop({:?} @ {:?})", terminator, loc);
-    let TerminatorKind::Drop { ref place, target, unwind, replace } = terminator.kind else {
+    let TerminatorKind::Drop { ref place, target, unwind, replace, drop, async_fut } =
+        terminator.kind
+    else {
         unreachable!();
     };
 
@@ -103,6 +105,8 @@ fn add_move_for_packed_drop<'tcx>(
             target: storage_dead_block,
             unwind,
             replace,
+            drop,
+            async_fut,
         },
     );
 }
