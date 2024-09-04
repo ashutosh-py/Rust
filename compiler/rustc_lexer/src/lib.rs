@@ -91,6 +91,16 @@ pub enum TokenKind {
     /// tokens.
     UnknownPrefix,
 
+    /// An unknown prefix in a lifetime, like `'foo#`.
+    ///
+    /// Note that like above, only the `'` and prefix are included in the token
+    /// and not the separator.
+    UnknownPrefixLifetime,
+
+    /// `'r`, which is parsed into `'r#lt` in edition 2021 and above. Before
+    /// edition 2021, we warn that it's a reserved syntax.
+    RawLifetimePrefix,
+
     /// Similar to the above, but *always* an error on every edition. This is used
     /// for emoji identifier recovery, as those are not meant to be ever accepted.
     InvalidPrefix,
@@ -677,9 +687,14 @@ impl Cursor<'_> {
             return Literal { kind, suffix_start };
         }
 
+        if self.first() == 'r' && self.second() == '#' && is_id_start(self.third()) {
+            // Eat "r" character.
+            self.bump();
+            return RawLifetimePrefix;
+        }
+
         // Either a lifetime or a character literal with
         // length greater than 1.
-
         let starts_with_number = self.first().is_ascii_digit();
 
         // Skip the literal contents.
@@ -688,15 +703,17 @@ impl Cursor<'_> {
         self.bump();
         self.eat_while(is_id_continue);
 
-        // Check if after skipping literal contents we've met a closing
-        // single quote (which means that user attempted to create a
-        // string with single quotes).
-        if self.first() == '\'' {
-            self.bump();
-            let kind = Char { terminated: true };
-            Literal { kind, suffix_start: self.pos_within_token() }
-        } else {
-            Lifetime { starts_with_number }
+        match self.first() {
+            // Check if after skipping literal contents we've met a closing
+            // single quote (which means that user attempted to create a
+            // string with single quotes).
+            '\'' => {
+                self.bump();
+                let kind = Char { terminated: true };
+                Literal { kind, suffix_start: self.pos_within_token() }
+            }
+            '#' if !starts_with_number => UnknownPrefixLifetime,
+            _ => Lifetime { starts_with_number },
         }
     }
 
