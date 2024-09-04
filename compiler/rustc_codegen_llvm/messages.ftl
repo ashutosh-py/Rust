@@ -7,6 +7,9 @@ codegen_llvm_dynamic_linking_with_lto =
 
 codegen_llvm_fixed_x18_invalid_arch = the `-Zfixed-x18` flag is not supported on the `{$arch}` architecture
 
+codegen_llvm_forbidden_ctarget_feature =
+    target feature `{$feature}` cannot be toggled with `-Ctarget-feature`
+
 codegen_llvm_from_llvm_diag = {$message}
 
 codegen_llvm_from_llvm_optimization_diag = {$filename}:{$line}:{$column} {$pass_name} ({$kind}): {$message}
