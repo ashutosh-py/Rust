@@ -798,3 +798,4 @@ fn path_to_string(path: &QPath<'_>) -> Result<String, ()> {
     inner(&mut s, path)?;
     Ok(s)
 }
+

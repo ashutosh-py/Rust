@@ -30,6 +30,7 @@
 #![doc(html_root_url = "https://doc.rust-lang.org/nightly/nightly-rustc/")]
 #![doc(rust_logo)]
 #![feature(array_windows)]
+#![feature(box_into_inner)]
 #![feature(box_patterns)]
 #![feature(control_flow_enum)]
 #![feature(extract_if)]
@@ -164,7 +165,7 @@ early_lint_methods!(
     [
         pub BuiltinCombinedEarlyLintPass,
         [
-            UnusedParens: UnusedParens::new(),
+            UnusedParens: UnusedParens::default(),
             UnusedBraces: UnusedBraces,
             UnusedImportBraces: UnusedImportBraces,
             UnsafeCode: UnsafeCode,
@@ -172,7 +173,7 @@ early_lint_methods!(
             AnonymousParameters: AnonymousParameters,
             EllipsisInclusiveRangePatterns: EllipsisInclusiveRangePatterns::default(),
             NonCamelCaseTypes: NonCamelCaseTypes,
-            DeprecatedAttr: DeprecatedAttr::new(),
+            DeprecatedAttr: DeprecatedAttr::default(),
             WhileTrue: WhileTrue,
             NonAsciiIdents: NonAsciiIdents,
             HiddenUnicodeCodepoints: HiddenUnicodeCodepoints,
@@ -193,7 +194,6 @@ late_lint_methods!(
             ForLoopsOverFallibles: ForLoopsOverFallibles,
             DerefIntoDynSupertrait: DerefIntoDynSupertrait,
             DropForgetUseless: DropForgetUseless,
-            HardwiredLints: HardwiredLints,
             ImproperCTypesDeclarations: ImproperCTypesDeclarations,
             ImproperCTypesDefinitions: ImproperCTypesDefinitions,
             InvalidFromUtf8: InvalidFromUtf8,
@@ -271,6 +271,7 @@ fn register_builtins(store: &mut LintStore) {
     store.register_lints(&BuiltinCombinedEarlyLintPass::get_lints());
     store.register_lints(&BuiltinCombinedModuleLateLintPass::get_lints());
     store.register_lints(&foreign_modules::get_lints());
+    store.register_lints(&HardwiredLints::default().get_lints());
 
     add_lint_group!(
         "nonstandard_style",
@@ -578,25 +579,25 @@ fn register_builtins(store: &mut LintStore) {
 }
 
 fn register_internals(store: &mut LintStore) {
-    store.register_lints(&LintPassImpl::get_lints());
+    store.register_lints(&LintPassImpl::default().get_lints());
     store.register_early_pass(|| Box::new(LintPassImpl));
-    store.register_lints(&DefaultHashTypes::get_lints());
+    store.register_lints(&DefaultHashTypes::default().get_lints());
     store.register_late_mod_pass(|_| Box::new(DefaultHashTypes));
-    store.register_lints(&QueryStability::get_lints());
+    store.register_lints(&QueryStability::default().get_lints());
     store.register_late_mod_pass(|_| Box::new(QueryStability));
-    store.register_lints(&ExistingDocKeyword::get_lints());
+    store.register_lints(&ExistingDocKeyword::default().get_lints());
     store.register_late_mod_pass(|_| Box::new(ExistingDocKeyword));
-    store.register_lints(&TyTyKind::get_lints());
+    store.register_lints(&TyTyKind::default().get_lints());
     store.register_late_mod_pass(|_| Box::new(TyTyKind));
-    store.register_lints(&TypeIr::get_lints());
+    store.register_lints(&TypeIr::default().get_lints());
     store.register_late_mod_pass(|_| Box::new(TypeIr));
-    store.register_lints(&Diagnostics::get_lints());
+    store.register_lints(&Diagnostics::default().get_lints());
     store.register_late_mod_pass(|_| Box::new(Diagnostics));
-    store.register_lints(&BadOptAccess::get_lints());
+    store.register_lints(&BadOptAccess::default().get_lints());
     store.register_late_mod_pass(|_| Box::new(BadOptAccess));
-    store.register_lints(&PassByValue::get_lints());
+    store.register_lints(&PassByValue::default().get_lints());
     store.register_late_mod_pass(|_| Box::new(PassByValue));
-    store.register_lints(&SpanUseEqCtxt::get_lints());
+    store.register_lints(&SpanUseEqCtxt::default().get_lints());
     store.register_late_mod_pass(|_| Box::new(SpanUseEqCtxt));
     // FIXME(davidtwco): deliberately do not include `UNTRANSLATABLE_DIAGNOSTIC` and
     // `DIAGNOSTIC_OUTSIDE_OF_IMPL` here because `-Wrustc::internal` is provided to every crate and
