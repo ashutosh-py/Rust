@@ -21,6 +21,7 @@ use rustc_target::spec::abi;
 use rustc_type_ir::visit::TypeVisitableExt;
 use rustc_type_ir::TyKind::*;
 use rustc_type_ir::{self as ir, BoundVar, CollectAndApply, DynKind};
+use tracing::instrument;
 use ty::util::{AsyncDropGlueMorphology, IntTypeExt};
 
 use super::GenericParamDefKind;
@@ -500,6 +501,7 @@ impl<'tcx> Ty<'tcx> {
     }
 
     #[inline]
+    #[instrument(level = "debug", skip(tcx))]
     pub fn new_opaque(tcx: TyCtxt<'tcx>, def_id: DefId, args: GenericArgsRef<'tcx>) -> Ty<'tcx> {
         Ty::new_alias(tcx, ty::Opaque, AliasTy::new_from_args(tcx, def_id, args))
     }
@@ -1338,6 +1340,7 @@ impl<'tcx> Ty<'tcx> {
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(tcx))]
     pub fn fn_sig(self, tcx: TyCtxt<'tcx>) -> PolyFnSig<'tcx> {
         match self.kind() {
             FnDef(def_id, args) => tcx.fn_sig(*def_id).instantiate(tcx, args),

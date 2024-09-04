@@ -842,7 +842,6 @@ impl<'tcx> CheckAttrVisitor<'tcx> {
             | Target::Mod
             | Target::GlobalAsm
             | Target::TyAlias
-            | Target::OpaqueTy
             | Target::Enum
             | Target::Variant
             | Target::Struct
@@ -1356,7 +1355,6 @@ impl<'tcx> CheckAttrVisitor<'tcx> {
         ) {
             let article = match target {
                 Target::ExternCrate
-                | Target::OpaqueTy
                 | Target::Enum
                 | Target::Impl
                 | Target::Expression
