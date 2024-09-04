@@ -243,9 +243,9 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
         trait_pred: ty::PolyTraitPredicate<'tcx>,
         associated_ty: Option<(&'static str, Ty<'tcx>)>,
         mut body_id: LocalDefId,
-    ) {
+    ) -> bool {
         if trait_pred.skip_binder().polarity != ty::PredicatePolarity::Positive {
-            return;
+            return false;
         }
 
         let trait_pred = self.resolve_numeric_literals_with_default(trait_pred);
@@ -280,7 +280,7 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
                         trait_pred,
                         Some((ident, bounds)),
                     );
-                    return;
+                    return true;
                 }
 
                 hir::Node::TraitItem(hir::TraitItem {
@@ -294,7 +294,7 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
                         self.tcx, body_id, generics, "`Self`", err, None, projection, trait_pred,
                         None,
                     );
-                    return;
+                    return true;
                 }
 
                 hir::Node::TraitItem(hir::TraitItem {
@@ -322,7 +322,7 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
                         trait_pred,
                         None,
                     );
-                    return;
+                    return true;
                 }
                 hir::Node::Item(hir::Item {
                     kind:
@@ -342,7 +342,7 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
                         trait_pred,
                         None,
                     );
-                    return;
+                    return true;
                 }
 
                 hir::Node::Item(hir::Item {
@@ -375,7 +375,7 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
                         .iter()
                         .all(|g| g.is_suggestable(self.tcx, false))
                     {
-                        return;
+                        return false;
                     }
                     // Missing generic type parameter bound.
                     let param_name = self_ty.to_string();
@@ -407,7 +407,7 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
                         Some(trait_pred.def_id()),
                         None,
                     ) {
-                        return;
+                        return true;
                     }
                 }
 
@@ -433,10 +433,10 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
                         trait_pred,
                         associated_ty,
                     ) {
-                        return;
+                        return true;
                     }
                 }
-                hir::Node::Crate(..) => return,
+                hir::Node::Crate(..) => return false,
 
                 _ => {}
             }
